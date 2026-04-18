@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  MENU_ID_OPEN_OPTIONS,
   MENU_ID_TOGGLE_TRANSLATION,
-  buildOpenOptionsMenuItem,
   buildToggleMenuItem,
   getToggleMenuTitle,
   registerOptionalContextMenuShownListener,
-  registerOpenOptionsMenu,
   registerToggleMenu,
   refreshToggleMenu,
   type ContextMenuItem
@@ -35,16 +32,6 @@ describe("buildToggleMenuItem", () => {
   });
 });
 
-describe("buildOpenOptionsMenuItem", () => {
-  it("creates a page-level API configuration menu definition", () => {
-    expect(buildOpenOptionsMenuItem()).toEqual({
-      id: MENU_ID_OPEN_OPTIONS,
-      title: "Configure translator API",
-      contexts: ["page"]
-    });
-  });
-});
-
 describe("context menu api integration", () => {
   it("registers the toggle menu item", async () => {
     const created: ContextMenuItem[] = [];
@@ -62,24 +49,6 @@ describe("context menu api integration", () => {
       {
         id: MENU_ID_TOGGLE_TRANSLATION,
         title: "Translate current webpage",
-        contexts: ["page"]
-      }
-    ]);
-  });
-
-  it("registers the API configuration menu item", async () => {
-    const created: ContextMenuItem[] = [];
-
-    await registerOpenOptionsMenu({
-      create(item) {
-        created.push(item);
-      }
-    });
-
-    expect(created).toEqual([
-      {
-        id: MENU_ID_OPEN_OPTIONS,
-        title: "Configure translator API",
         contexts: ["page"]
       }
     ]);
