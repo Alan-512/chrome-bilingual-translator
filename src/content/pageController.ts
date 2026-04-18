@@ -1,7 +1,12 @@
 import { BlockStateStore } from "./blockStateStore";
 import { collectCandidateBlocks } from "./candidateDetector";
 import { createObserverCoordinator } from "./observerCoordinator";
-import { removeRenderedTranslations, renderTranslationBelow } from "./translationRenderer";
+import {
+  removeRenderedTranslationBlock,
+  removeRenderedTranslations,
+  renderTranslationBelow,
+  renderTranslationLoadingBelow
+} from "./translationRenderer";
 import { ensureStatusPill, updateStatusPill } from "./statusPill";
 
 type ObserverCoordinatorLike = {
@@ -83,7 +88,12 @@ export function createPageController(doc: Document, dependencies: PageController
       }
 
       observerCoordinator.observeCandidates(candidates.map((candidate) => candidate.element));
-      candidates.forEach((candidate) => stateStore.set(candidate.blockId, "pending"));
+      candidates.forEach((candidate) => {
+        stateStore.set(candidate.blockId, "pending");
+        renderTranslationLoadingBelow(candidate.element, {
+          blockId: candidate.blockId
+        });
+      });
       updateStatusPill(statusPill, { state: "translating", translatedBlockCount });
 
       let translations: Record<string, string>;
@@ -95,7 +105,10 @@ export function createPageController(doc: Document, dependencies: PageController
           }))
         );
       } catch (error) {
-        candidates.forEach((candidate) => stateStore.set(candidate.blockId, "failed"));
+        candidates.forEach((candidate) => {
+          stateStore.set(candidate.blockId, "failed");
+          removeRenderedTranslationBlock(doc, candidate.blockId);
+        });
         updateStatusPill(statusPill, {
           state: "error",
           translatedBlockCount,
@@ -114,6 +127,7 @@ export function createPageController(doc: Document, dependencies: PageController
         const translationText = translations[candidate.blockId];
         if (!translationText) {
           stateStore.set(candidate.blockId, "failed");
+          removeRenderedTranslationBlock(doc, candidate.blockId);
           continue;
         }
 

@@ -214,6 +214,43 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("renders inline loading placeholders while translation is pending", async () => {
+    let resolveTranslations: ((value: Record<string, string>) => void) | undefined;
+    const requestTranslations = vi.fn(
+      () =>
+        new Promise<Record<string, string>>((resolve) => {
+          resolveTranslations = resolve;
+        })
+    );
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    const activationPromise = controller.activate();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const loadingBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(loadingBlocks).toHaveLength(2);
+    expect(loadingBlocks[0]?.getAttribute("data-bilingual-translator-state")).toBe("loading");
+    expect(loadingBlocks[0]?.textContent).toContain("Translating");
+
+    const pendingBlocks = requestTranslations.mock.calls[0]?.[0] as Array<{ blockId: string; sourceText: string }>;
+    resolveTranslations?.(
+      Object.fromEntries(pendingBlocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    await activationPromise;
+
+    const translatedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(translatedBlocks[0]?.getAttribute("data-bilingual-translator-state")).toBe("translated");
+    expect(translatedBlocks[0]?.textContent).toContain("ZH:");
+    await controller.deactivate();
+  });
+
   it("deactivates and removes injected translations", async () => {
     const controller = createPageController(document, {
       requestTranslations: async (blocks) =>
