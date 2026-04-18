@@ -78,4 +78,37 @@ describe("background message router", () => {
       )
     ).rejects.toThrow(/Missing required configuration/);
   });
+
+  it("rejects remote HTTP API URLs before requesting translation", async () => {
+    const translateBlocks = vi.fn();
+    const requestApiPermission = vi.fn(async () => true);
+    const router = createBackgroundMessageRouter({
+      loadConfig: async () =>
+        buildPersistedConfigRecord({
+          apiBaseUrl: "http://api.example.com/v1/chat/completions",
+          apiKey: "secret-key",
+          model: "gpt-5-mini",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        }),
+      translator: {
+        translateBlocks
+      },
+      requestApiPermission,
+      tabSessionStore: new SessionStorageTabSessionStore(createMemoryStorageArea())
+    });
+
+    await expect(
+      router.handleMessage(
+        {
+          type: "translation/request",
+          tabId: 8,
+          blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+        },
+        { tab: { id: 8 } }
+      )
+    ).rejects.toThrow(/HTTPS/);
+    expect(requestApiPermission).not.toHaveBeenCalled();
+    expect(translateBlocks).not.toHaveBeenCalled();
+  });
 });

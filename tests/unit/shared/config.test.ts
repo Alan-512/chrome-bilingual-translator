@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_EXTENSION_CONFIG,
   buildPersistedConfigRecord,
+  getApiBaseUrlSecurityError,
   getMissingConfigFields,
   normalizeApiBaseUrlToOrigin
 } from "../../../src/shared/config";
@@ -67,5 +68,24 @@ describe("API base URL normalization", () => {
 
   it("returns an empty string for invalid input", () => {
     expect(normalizeApiBaseUrlToOrigin("not a valid url")).toBe("");
+  });
+});
+
+describe("API base URL security validation", () => {
+  it("allows HTTPS API URLs", () => {
+    expect(getApiBaseUrlSecurityError("https://ark.cn-beijing.volces.com/api/v3/chat/completions")).toBeNull();
+  });
+
+  it("allows HTTP only for localhost development endpoints", () => {
+    expect(getApiBaseUrlSecurityError("http://localhost:11434/v1/chat/completions")).toBeNull();
+    expect(getApiBaseUrlSecurityError("http://127.0.0.1:11434/v1/chat/completions")).toBeNull();
+  });
+
+  it("rejects remote HTTP API URLs", () => {
+    expect(getApiBaseUrlSecurityError("http://api.example.com/v1/chat/completions")).toContain("HTTPS");
+  });
+
+  it("rejects invalid API URLs", () => {
+    expect(getApiBaseUrlSecurityError("not a valid url")).toContain("valid URL");
   });
 });

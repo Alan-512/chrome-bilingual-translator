@@ -74,6 +74,17 @@ h1 {
   background: #fffdf9;
 }
 
+.origin-preview {
+  margin: -10px 0 0;
+  border: 1px solid rgba(138, 90, 37, 0.16);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #5d472b;
+  background: rgba(234, 158, 67, 0.08);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .toggle {
   display: flex;
   gap: 10px;

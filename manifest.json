@@ -9,5 +9,5 @@
   },
   "options_page": "dist/options.html",
   "permissions": ["contextMenus", "storage", "activeTab", "scripting"],
-  "optional_host_permissions": ["https://*/*", "http://*/*"]
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"]
 }

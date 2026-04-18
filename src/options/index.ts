@@ -1,4 +1,9 @@
-import { buildPersistedConfigRecord, type PersistedExtensionConfigInput } from "../shared/config";
+import {
+  buildPersistedConfigRecord,
+  getApiBaseUrlSecurityError,
+  normalizeApiBaseUrlToOrigin,
+  type PersistedExtensionConfigInput
+} from "../shared/config";
 import { createChromeStorageArea, loadExtensionConfig, saveExtensionConfig, type StorageAreaLike } from "../shared/storage";
 
 type OptionsPageDependencies = {
@@ -14,6 +19,7 @@ type OptionsFormControls = {
   translateTitles: HTMLInputElement;
   translateShortContentBlocks: HTMLInputElement;
   status: HTMLElement;
+  apiOriginPreview: HTMLElement;
 };
 
 function queryControls(doc: Document): OptionsFormControls {
@@ -24,12 +30,22 @@ function queryControls(doc: Document): OptionsFormControls {
   const translateTitles = doc.querySelector<HTMLInputElement>("[name='translateTitles']");
   const translateShortContentBlocks = doc.querySelector<HTMLInputElement>("[name='translateShortContentBlocks']");
   const status = doc.querySelector<HTMLElement>("[data-role='status']");
+  const apiOriginPreview = doc.querySelector<HTMLElement>("[data-role='api-origin-preview']");
 
-  if (!form || !apiBaseUrl || !apiKey || !model || !translateTitles || !translateShortContentBlocks || !status) {
+  if (
+    !form ||
+    !apiBaseUrl ||
+    !apiKey ||
+    !model ||
+    !translateTitles ||
+    !translateShortContentBlocks ||
+    !status ||
+    !apiOriginPreview
+  ) {
     throw new Error("Options page controls are missing.");
   }
 
-  return { form, apiBaseUrl, apiKey, model, translateTitles, translateShortContentBlocks, status };
+  return { form, apiBaseUrl, apiKey, model, translateTitles, translateShortContentBlocks, status, apiOriginPreview };
 }
 
 function setStatus(element: HTMLElement, message: string, variant: "neutral" | "success" | "error" = "neutral") {
@@ -73,6 +89,11 @@ function collectFormInput(controls: OptionsFormControls): PersistedExtensionConf
   };
 }
 
+function updateApiOriginPreview(controls: OptionsFormControls) {
+  const origin = normalizeApiBaseUrlToOrigin(controls.apiBaseUrl.value.trim());
+  controls.apiOriginPreview.textContent = origin ? `Requests will be sent to ${origin}` : "Enter a valid API URL.";
+}
+
 export async function mountOptionsPage(
   doc: Document,
   dependencies: OptionsPageDependencies
@@ -85,12 +106,24 @@ export async function mountOptionsPage(
   controls.model.value = savedConfig.model;
   controls.translateTitles.checked = savedConfig.translateTitles;
   controls.translateShortContentBlocks.checked = savedConfig.translateShortContentBlocks;
+  updateApiOriginPreview(controls);
   setStatus(controls.status, "Ready to save configuration.");
+
+  controls.apiBaseUrl.addEventListener("input", () => {
+    updateApiOriginPreview(controls);
+  });
 
   controls.form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const nextConfig = buildPersistedConfigRecord(collectFormInput(controls));
+    const securityError = getApiBaseUrlSecurityError(nextConfig.apiBaseUrl);
+    if (securityError) {
+      setStatus(controls.status, securityError, "error");
+      showToast(doc, securityError, "error");
+      return;
+    }
+
     const permissionGranted = nextConfig.apiOrigin
       ? await dependencies.requestApiOriginPermission(nextConfig.apiOrigin)
       : false;

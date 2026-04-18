@@ -14,6 +14,7 @@ function renderOptionsDom() {
             API Base URL
             <input name="apiBaseUrl" type="url" />
           </label>
+          <p data-role="api-origin-preview"></p>
           <label>
             API Key
             <input name="apiKey" type="password" />
@@ -115,5 +116,45 @@ describe("mountOptionsPage", () => {
 
     expect(document.querySelector("[data-role='toast']")?.textContent).toContain("permission was denied");
     expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("error");
+  });
+
+  it("rejects remote HTTP API URLs before saving", async () => {
+    const storage = createMemoryStorageArea();
+
+    await mountOptionsPage(document, {
+      storageArea: storage,
+      requestApiOriginPermission: async () => true
+    });
+
+    (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value =
+      "http://api.test.dev/v1/chat/completions";
+    (document.querySelector("[name='apiKey']") as HTMLInputElement).value = "secret";
+    (document.querySelector("[name='model']") as HTMLInputElement).value = "gpt-5-mini";
+
+    document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const savedConfig = await loadExtensionConfig(storage);
+    expect(savedConfig.apiBaseUrl).toBe("");
+    expect(document.querySelector("[data-role='toast']")?.textContent).toContain("HTTPS");
+    expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("error");
+  });
+
+  it("shows the destination origin for the configured API URL", async () => {
+    const storage = createMemoryStorageArea();
+
+    await mountOptionsPage(document, {
+      storageArea: storage,
+      requestApiOriginPermission: async () => true
+    });
+
+    const input = document.querySelector("[name='apiBaseUrl']") as HTMLInputElement;
+    input.value = "https://ark.cn-beijing.volces.com/api/v3/chat/completions";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(document.querySelector("[data-role='api-origin-preview']")?.textContent).toContain(
+      "ark.cn-beijing.volces.com"
+    );
   });
 });

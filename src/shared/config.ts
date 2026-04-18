@@ -40,6 +40,27 @@ export function buildPersistedConfigRecord(input: PersistedExtensionConfigInput)
   };
 }
 
+export function getApiBaseUrlSecurityError(apiBaseUrl: string): string | null {
+  let url: URL;
+
+  try {
+    url = new URL(apiBaseUrl);
+  } catch {
+    return "API Base URL must be a valid URL.";
+  }
+
+  if (url.protocol === "https:") {
+    return null;
+  }
+
+  const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol === "http:" && isLocalhost) {
+    return null;
+  }
+
+  return "API Base URL must use HTTPS unless it points to localhost for local development.";
+}
+
 export function getMissingConfigFields(config: ExtensionConfig): Array<keyof PersistedExtensionConfigInput> {
   const missingFields: Array<keyof PersistedExtensionConfigInput> = [];
 

@@ -1,4 +1,4 @@
-import { getMissingConfigFields, type ExtensionConfig } from "../shared/config";
+import { getApiBaseUrlSecurityError, getMissingConfigFields, type ExtensionConfig } from "../shared/config";
 import { type RuntimeMessage, type TranslationRequestMessage } from "../shared/messageTypes";
 import { type TranslatorClient } from "../shared/translatorClient";
 import { type ApiOriginPermissionRequester } from "./permissionManager";
@@ -26,6 +26,11 @@ async function handleTranslationRequest(
 
   if (missingFields.length > 0) {
     throw new Error(`Missing required configuration: ${missingFields.join(", ")}`);
+  }
+
+  const securityError = getApiBaseUrlSecurityError(config.apiBaseUrl);
+  if (securityError) {
+    throw new Error(securityError);
   }
 
   if (config.apiOrigin) {
