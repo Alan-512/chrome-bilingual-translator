@@ -32,11 +32,18 @@ function renderOptionsDom() {
             Translate short content blocks
           </label>
           <button type="submit">Save</button>
+          <button type="button" data-role="test-api">Test API</button>
         </form>
         <p data-role="status"></p>
       </section>
     </main>
   `;
+}
+
+async function flushAsyncWork() {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 describe("mountOptionsPage", () => {
@@ -86,8 +93,7 @@ describe("mountOptionsPage", () => {
     (document.querySelector("[name='translateShortContentBlocks']") as HTMLInputElement).checked = false;
 
     document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncWork();
 
     const savedConfig = await loadExtensionConfig(storage);
     expect(savedConfig.apiOrigin).toBe("https://api.test.dev");
@@ -111,8 +117,7 @@ describe("mountOptionsPage", () => {
     (document.querySelector("[name='model']") as HTMLInputElement).value = "gpt-5-mini";
 
     document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncWork();
 
     expect(document.querySelector("[data-role='toast']")?.textContent).toContain("permission was denied");
     expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("error");
@@ -132,8 +137,7 @@ describe("mountOptionsPage", () => {
     (document.querySelector("[name='model']") as HTMLInputElement).value = "gpt-5-mini";
 
     document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncWork();
 
     const savedConfig = await loadExtensionConfig(storage);
     expect(savedConfig.apiBaseUrl).toBe("");
@@ -156,5 +160,79 @@ describe("mountOptionsPage", () => {
     expect(document.querySelector("[data-role='api-origin-preview']")?.textContent).toContain(
       "ark.cn-beijing.volces.com"
     );
+  });
+
+  it("tests the current API configuration without overwriting saved settings", async () => {
+    const storage = createMemoryStorageArea({
+      extensionConfig: {
+        apiBaseUrl: "https://saved.example.com/v1/chat/completions",
+        apiOrigin: "https://saved.example.com",
+        apiKey: "saved-key",
+        model: "saved-model",
+        translateTitles: true,
+        translateShortContentBlocks: true,
+        targetLanguage: "zh-CN"
+      }
+    });
+    const fetchImpl = async (_input: RequestInfo | URL, init?: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "OK"
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+
+    await mountOptionsPage(document, {
+      storageArea: storage,
+      requestApiOriginPermission: async () => true,
+      fetchImpl
+    });
+
+    (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://api.test.dev/v1/chat/completions";
+    (document.querySelector("[name='apiKey']") as HTMLInputElement).value = "test-key";
+    (document.querySelector("[name='model']") as HTMLInputElement).value = "test-model";
+
+    document.querySelector("[data-role='test-api']")?.dispatchEvent(new Event("click", { bubbles: true }));
+    await flushAsyncWork();
+
+    const savedConfig = await loadExtensionConfig(storage);
+    expect(savedConfig.apiBaseUrl).toBe("https://saved.example.com/v1/chat/completions");
+    expect(document.querySelector("[data-role='toast']")?.textContent).toContain("API connection succeeded");
+    expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("success");
+  });
+
+  it("shows the returned API error when test api fails", async () => {
+    const storage = createMemoryStorageArea();
+    const fetchImpl = async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      ({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        async json() {
+          return { error: { message: "Bad model" } };
+        }
+      } as Response);
+
+    await mountOptionsPage(document, {
+      storageArea: storage,
+      requestApiOriginPermission: async () => true,
+      fetchImpl
+    });
+
+    (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://api.test.dev/v1/chat/completions";
+    (document.querySelector("[name='apiKey']") as HTMLInputElement).value = "test-key";
+    (document.querySelector("[name='model']") as HTMLInputElement).value = "bad-model";
+
+    document.querySelector("[data-role='test-api']")?.dispatchEvent(new Event("click", { bubbles: true }));
+    await flushAsyncWork();
+
+    expect(document.querySelector("[data-role='toast']")?.textContent).toContain("Bad model");
+    expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("error");
   });
 });

@@ -96,6 +96,7 @@ h1 {
 .actions {
   display: flex;
   justify-content: flex-start;
+  gap: 12px;
 }
 
 .button {
@@ -107,6 +108,12 @@ h1 {
   color: white;
   background: linear-gradient(135deg, #d66e22, #ea9e43);
   cursor: pointer;
+}
+
+.button-secondary {
+  color: #8a5a25;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(138, 90, 37, 0.18);
 }
 
 .status {

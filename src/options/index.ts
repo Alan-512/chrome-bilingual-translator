@@ -9,10 +9,12 @@ import { createChromeStorageArea, loadExtensionConfig, saveExtensionConfig, type
 type OptionsPageDependencies = {
   storageArea: StorageAreaLike;
   requestApiOriginPermission: (origin: string) => Promise<boolean>;
+  fetchImpl?: typeof fetch;
 };
 
 type OptionsFormControls = {
   form: HTMLFormElement;
+  testApi: HTMLButtonElement;
   apiBaseUrl: HTMLInputElement;
   apiKey: HTMLInputElement;
   model: HTMLInputElement;
@@ -24,6 +26,7 @@ type OptionsFormControls = {
 
 function queryControls(doc: Document): OptionsFormControls {
   const form = doc.querySelector<HTMLFormElement>("[data-role='options-form']");
+  const testApi = doc.querySelector<HTMLButtonElement>("[data-role='test-api']");
   const apiBaseUrl = doc.querySelector<HTMLInputElement>("[name='apiBaseUrl']");
   const apiKey = doc.querySelector<HTMLInputElement>("[name='apiKey']");
   const model = doc.querySelector<HTMLInputElement>("[name='model']");
@@ -34,6 +37,7 @@ function queryControls(doc: Document): OptionsFormControls {
 
   if (
     !form ||
+    !testApi ||
     !apiBaseUrl ||
     !apiKey ||
     !model ||
@@ -45,7 +49,7 @@ function queryControls(doc: Document): OptionsFormControls {
     throw new Error("Options page controls are missing.");
   }
 
-  return { form, apiBaseUrl, apiKey, model, translateTitles, translateShortContentBlocks, status, apiOriginPreview };
+  return { form, testApi, apiBaseUrl, apiKey, model, translateTitles, translateShortContentBlocks, status, apiOriginPreview };
 }
 
 function setStatus(element: HTMLElement, message: string, variant: "neutral" | "success" | "error" = "neutral") {
@@ -94,6 +98,84 @@ function updateApiOriginPreview(controls: OptionsFormControls) {
   controls.apiOriginPreview.textContent = origin ? `Requests will be sent to ${origin}` : "Enter a valid API URL.";
 }
 
+async function readApiErrorMessage(response: Response): Promise<string> {
+  try {
+    const payload = (await response.json()) as { error?: { message?: string } };
+    const message = payload.error?.message?.trim();
+    if (message) {
+      return message;
+    }
+  } catch {
+    // ignore non-json error bodies
+  }
+
+  return `API test failed with ${response.status} ${response.statusText}`.trim();
+}
+
+async function testApiConfiguration(
+  controls: OptionsFormControls,
+  dependencies: OptionsPageDependencies,
+  doc: Document
+) {
+  const nextConfig = buildPersistedConfigRecord(collectFormInput(controls));
+  const securityError = getApiBaseUrlSecurityError(nextConfig.apiBaseUrl);
+  if (securityError) {
+    setStatus(controls.status, securityError, "error");
+    showToast(doc, securityError, "error");
+    return;
+  }
+
+  const permissionGranted = nextConfig.apiOrigin
+    ? await dependencies.requestApiOriginPermission(nextConfig.apiOrigin)
+    : false;
+  if (nextConfig.apiOrigin && !permissionGranted) {
+    setStatus(controls.status, "API origin permission was denied.", "error");
+    showToast(doc, "API origin permission was denied.", "error");
+    return;
+  }
+
+  controls.testApi.disabled = true;
+  const originalLabel = controls.testApi.textContent;
+  controls.testApi.textContent = "Testing...";
+
+  try {
+    const response = await (dependencies.fetchImpl ?? fetch)(nextConfig.apiBaseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${nextConfig.apiKey}`
+      },
+      body: JSON.stringify({
+        model: nextConfig.model,
+        max_tokens: 8,
+        messages: [
+          {
+            role: "user",
+            content: 'Reply with "OK" only.'
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorMessage = await readApiErrorMessage(response);
+      setStatus(controls.status, errorMessage, "error");
+      showToast(doc, errorMessage, "error");
+      return;
+    }
+
+    setStatus(controls.status, "API connection succeeded.", "success");
+    showToast(doc, "API connection succeeded.", "success");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "API connection failed.";
+    setStatus(controls.status, message, "error");
+    showToast(doc, message, "error");
+  } finally {
+    controls.testApi.disabled = false;
+    controls.testApi.textContent = originalLabel;
+  }
+}
+
 export async function mountOptionsPage(
   doc: Document,
   dependencies: OptionsPageDependencies
@@ -111,6 +193,10 @@ export async function mountOptionsPage(
 
   controls.apiBaseUrl.addEventListener("input", () => {
     updateApiOriginPreview(controls);
+  });
+
+  controls.testApi.addEventListener("click", () => {
+    void testApiConfiguration(controls, dependencies, doc);
   });
 
   controls.form.addEventListener("submit", async (event) => {
@@ -147,6 +233,7 @@ async function bootstrap() {
 
   await mountOptionsPage(document, {
     storageArea: createChromeStorageArea(chrome.storage.local),
+    fetchImpl: (...args) => fetch(...args),
     requestApiOriginPermission: async (origin) => {
       if (!chrome.permissions) {
         return true;
