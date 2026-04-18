@@ -25,6 +25,16 @@ type OpenAiCompatibleResponse = {
   }>;
 };
 
+type ResponsesApiResponse = {
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  }>;
+};
+
 function parseTranslationPayload(content: string, expectedBlockIds: string[]): Record<string, string> {
   const parsed = JSON.parse(content) as Record<string, unknown>;
   const missingBlockIds = expectedBlockIds.filter((blockId) => typeof parsed[blockId] !== "string");
@@ -34,6 +44,66 @@ function parseTranslationPayload(content: string, expectedBlockIds: string[]): R
   }
 
   return Object.fromEntries(expectedBlockIds.map((blockId) => [blockId, String(parsed[blockId])]));
+}
+
+function resolveApiMode(apiBaseUrl: string) {
+  const normalized = apiBaseUrl.replace(/\/+$/, "");
+  if (normalized.endsWith("/chat/completions")) {
+    return { mode: "chat" as const, url: normalized };
+  }
+
+  if (normalized.endsWith("/responses")) {
+    return { mode: "responses" as const, url: normalized };
+  }
+
+  return { mode: "responses" as const, url: `${normalized}/responses` };
+}
+
+function buildResponsesApiInput(blocks: TranslationBlockInput[]) {
+  return [
+    {
+      role: "system",
+      content: [
+        {
+          type: "input_text",
+          text:
+            "You are a translation engine. Detect the source language automatically and translate every block to Simplified Chinese. Return a strict JSON object mapping each blockId to its translated string."
+        }
+      ]
+    },
+    {
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: JSON.stringify(
+            {
+              task: "Translate the following content blocks into Simplified Chinese.",
+              blocks
+            },
+            null,
+            2
+          )
+        }
+      ]
+    }
+  ];
+}
+
+function extractResponsesApiText(responseBody: ResponsesApiResponse): string | null {
+  if (typeof responseBody.output_text === "string" && responseBody.output_text.trim()) {
+    return responseBody.output_text;
+  }
+
+  for (const outputItem of responseBody.output ?? []) {
+    for (const contentItem of outputItem.content ?? []) {
+      if (typeof contentItem.text === "string" && contentItem.text.trim()) {
+        return contentItem.text;
+      }
+    }
+  }
+
+  return null;
 }
 
 export function createTranslatorClient(options: CreateTranslatorClientOptions): TranslatorClient {
@@ -62,19 +132,27 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
-        const response = await options.fetchImpl(config.apiBaseUrl, {
+        const resolvedApi = resolveApiMode(config.apiBaseUrl);
+        const response = await options.fetchImpl(resolvedApi.url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${config.apiKey}`
           },
-          body: JSON.stringify({
-            model: config.model,
-            response_format: {
-              type: "json_object"
-            },
-            messages: buildTranslationMessages(uncachedBlocks)
-          }),
+          body: JSON.stringify(
+            resolvedApi.mode === "chat"
+              ? {
+                  model: config.model,
+                  response_format: {
+                    type: "json_object"
+                  },
+                  messages: buildTranslationMessages(uncachedBlocks)
+                }
+              : {
+                  model: config.model,
+                  input: buildResponsesApiInput(uncachedBlocks)
+                }
+          ),
           signal: controller.signal
         });
 
@@ -82,8 +160,11 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           throw new Error(`Translation request failed with ${response.status} ${response.statusText}`);
         }
 
-        const responseBody = (await response.json()) as OpenAiCompatibleResponse;
-        const content = responseBody.choices?.[0]?.message?.content;
+        const responseBody = (await response.json()) as OpenAiCompatibleResponse & ResponsesApiResponse;
+        const content =
+          resolvedApi.mode === "chat"
+            ? responseBody.choices?.[0]?.message?.content
+            : extractResponsesApiText(responseBody);
 
         if (!content) {
           throw new Error("Translation response did not include a content payload.");

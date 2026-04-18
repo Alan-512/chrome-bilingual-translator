@@ -157,4 +157,50 @@ describe("translator client", () => {
       })
     ).rejects.toThrow(/429/);
   });
+
+  it("supports base URLs that require the OpenAI responses endpoint", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe("https://ark.cn-beijing.volces.com/api/v3/responses");
+      const body = JSON.parse(String(init?.body));
+      expect(body.model).toBe("ep-20260321184346-rlw84");
+      expect(body.input[0].role).toBe("system");
+      expect(body.input[1].content[0].type).toBe("input_text");
+
+      return new Response(
+        JSON.stringify({
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    alpha: "第一段"
+                  })
+                }
+              ]
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+        apiKey: "secret-key",
+        model: "ep-20260321184346-rlw84",
+        translateTitles: true,
+        translateShortContentBlocks: true
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(result).toEqual({ alpha: "第一段" });
+  });
 });

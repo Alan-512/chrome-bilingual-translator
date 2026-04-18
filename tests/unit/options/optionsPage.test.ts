@@ -235,4 +235,34 @@ describe("mountOptionsPage", () => {
     expect(document.querySelector("[data-role='toast']")?.textContent).toContain("Bad model");
     expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("error");
   });
+
+  it("tests root base URLs through the responses endpoint", async () => {
+    const storage = createMemoryStorageArea();
+    const fetchImpl = async (input: RequestInfo | URL, _init?: RequestInit) => {
+      expect(String(input)).toBe("https://ark.cn-beijing.volces.com/api/v3/responses");
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        async json() {
+          return { output: [] };
+        }
+      } as Response;
+    };
+
+    await mountOptionsPage(document, {
+      storageArea: storage,
+      requestApiOriginPermission: async () => true,
+      fetchImpl
+    });
+
+    (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://ark.cn-beijing.volces.com/api/v3";
+    (document.querySelector("[name='apiKey']") as HTMLInputElement).value = "test-key";
+    (document.querySelector("[name='model']") as HTMLInputElement).value = "ep-20260321184346-rlw84";
+
+    document.querySelector("[data-role='test-api']")?.dispatchEvent(new Event("click", { bubbles: true }));
+    await flushAsyncWork();
+
+    expect(document.querySelector("[data-role='toast']")?.textContent).toContain("API connection succeeded");
+  });
 });

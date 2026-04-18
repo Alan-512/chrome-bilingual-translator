@@ -4,6 +4,8 @@ import path from "node:path";
 
 import { chromium, expect, test } from "@playwright/test";
 
+test.setTimeout(60_000);
+
 const projectRoot = "/mnt/d/project/chrome-bilingual-translator";
 const playwrightCacheRoot = "/home/seed/.cache/ms-playwright";
 

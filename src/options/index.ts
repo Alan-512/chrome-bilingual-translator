@@ -98,6 +98,44 @@ function updateApiOriginPreview(controls: OptionsFormControls) {
   controls.apiOriginPreview.textContent = origin ? `Requests will be sent to ${origin}` : "Enter a valid API URL.";
 }
 
+function resolveApiTestTarget(apiBaseUrl: string) {
+  const normalized = apiBaseUrl.replace(/\/+$/, "");
+  if (normalized.endsWith("/chat/completions")) {
+    return {
+      url: normalized,
+      body: {
+        model: undefined as string | undefined,
+        max_tokens: 8,
+        messages: [
+          {
+            role: "user",
+            content: 'Reply with "OK" only.'
+          }
+        ]
+      }
+    };
+  }
+
+  const url = normalized.endsWith("/responses") ? normalized : `${normalized}/responses`;
+  return {
+    url,
+    body: {
+      model: undefined as string | undefined,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: 'Reply with "OK" only.'
+            }
+          ]
+        }
+      ]
+    }
+  };
+}
+
 async function readApiErrorMessage(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as { error?: { message?: string } };
@@ -139,21 +177,16 @@ async function testApiConfiguration(
   controls.testApi.textContent = "Testing...";
 
   try {
-    const response = await (dependencies.fetchImpl ?? fetch)(nextConfig.apiBaseUrl, {
+    const testTarget = resolveApiTestTarget(nextConfig.apiBaseUrl);
+    const response = await (dependencies.fetchImpl ?? fetch)(testTarget.url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${nextConfig.apiKey}`
       },
       body: JSON.stringify({
-        model: nextConfig.model,
-        max_tokens: 8,
-        messages: [
-          {
-            role: "user",
-            content: 'Reply with "OK" only.'
-          }
-        ]
+        ...testTarget.body,
+        model: nextConfig.model
       })
     });
 
