@@ -227,4 +227,21 @@ describe("pageController", () => {
 
     expect(document.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
   });
+
+  it("shows a visible error when translation requests fail", async () => {
+    const controller = createPageController(document, {
+      requestTranslations: async () => {
+        throw new Error("Missing required configuration: API key");
+      },
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await controller.activate();
+
+    const pill = document.querySelector("[data-bilingual-translator-pill='true']") as HTMLElement;
+    expect(pill.dataset.state).toBe("error");
+    expect(pill.textContent).toContain("Missing required configuration: API key");
+    expect(document.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
+  });
 });

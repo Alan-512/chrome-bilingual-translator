@@ -1,6 +1,7 @@
 import { type TabSessionRecord } from "./tabSessionStore";
 
 export const MENU_ID_TOGGLE_TRANSLATION = "toggle-page-translation";
+export const MENU_ID_OPEN_OPTIONS = "open-translator-options";
 
 export type ContextMenuItem = {
   id: string;
@@ -34,11 +35,23 @@ export function buildToggleMenuItem(session: Pick<TabSessionRecord, "enabled">):
   };
 }
 
+export function buildOpenOptionsMenuItem(): ContextMenuItem {
+  return {
+    id: MENU_ID_OPEN_OPTIONS,
+    title: "Configure translator API",
+    contexts: ["page"]
+  };
+}
+
 export async function registerToggleMenu(
   api: ContextMenusCreateApi,
   session: Pick<TabSessionRecord, "enabled">
 ): Promise<void> {
   await api.create(buildToggleMenuItem(session));
+}
+
+export async function registerOpenOptionsMenu(api: ContextMenusCreateApi): Promise<void> {
+  await api.create(buildOpenOptionsMenuItem());
 }
 
 export async function refreshToggleMenu(

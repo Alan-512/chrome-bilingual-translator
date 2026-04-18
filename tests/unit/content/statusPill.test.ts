@@ -21,10 +21,12 @@ describe("status pill", () => {
     updateStatusPill(pill, {
       state: "error",
       translatedBlockCount: 3,
-      failedBlockCount: 2
+      failedBlockCount: 2,
+      errorMessage: "Missing required configuration: API key"
     });
 
     expect(pill.dataset.state).toBe("error");
     expect(pill.textContent).toContain("2");
+    expect(pill.textContent).toContain("Missing required configuration: API key");
   });
 });

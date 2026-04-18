@@ -3,11 +3,13 @@ type StatusPillState =
       state: "idle" | "translating";
       translatedBlockCount: number;
       failedBlockCount?: number;
+      errorMessage?: string;
     }
   | {
       state: "translated" | "error";
       translatedBlockCount: number;
       failedBlockCount?: number;
+      errorMessage?: string;
     };
 
 const PILL_ATTRIBUTE = "data-bilingual-translator-pill";
@@ -39,7 +41,8 @@ export function updateStatusPill(pill: HTMLElement, state: StatusPillState): voi
   pill.dataset.state = state.state;
 
   if (state.state === "error") {
-    pill.textContent = `Errors: ${state.failedBlockCount ?? 0} | Done: ${state.translatedBlockCount}`;
+    const message = state.errorMessage ? ` | ${state.errorMessage}` : "";
+    pill.textContent = `Errors: ${state.failedBlockCount ?? 0} | Done: ${state.translatedBlockCount}${message}`;
     return;
   }
 

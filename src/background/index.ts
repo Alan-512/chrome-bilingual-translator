@@ -3,9 +3,11 @@ import { loadExtensionConfig } from "../shared/storage";
 import { createChromeStorageArea } from "../shared/storage";
 import { createTranslatorClient } from "../shared/translatorClient";
 import {
+  MENU_ID_OPEN_OPTIONS,
   MENU_ID_TOGGLE_TRANSLATION,
   refreshToggleMenu,
   registerOptionalContextMenuShownListener,
+  registerOpenOptionsMenu,
   registerToggleMenu
 } from "./contextMenus";
 import { createBackgroundMessageRouter } from "./messageRouter";
@@ -29,6 +31,7 @@ const messageRouter = createBackgroundMessageRouter({
 async function ensureMenuRegistered() {
   await chrome.contextMenus.removeAll();
   await registerToggleMenu(chrome.contextMenus, { enabled: false });
+  await registerOpenOptionsMenu(chrome.contextMenus);
 }
 
 async function sendLifecycleMessage(tabId: number, type: "page/activate" | "page/deactivate") {
@@ -69,6 +72,11 @@ async function bootstrap() {
   });
 
   chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === MENU_ID_OPEN_OPTIONS) {
+      void chrome.runtime.openOptionsPage();
+      return;
+    }
+
     if (info.menuItemId !== MENU_ID_TOGGLE_TRANSLATION || typeof tab?.id !== "number") {
       return;
     }

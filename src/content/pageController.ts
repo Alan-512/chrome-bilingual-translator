@@ -86,12 +86,29 @@ export function createPageController(doc: Document, dependencies: PageController
       candidates.forEach((candidate) => stateStore.set(candidate.blockId, "pending"));
       updateStatusPill(statusPill, { state: "translating", translatedBlockCount });
 
-      const translations = await dependencies.requestTranslations(
-        candidates.map((candidate) => ({
-          blockId: candidate.blockId,
-          sourceText: candidate.sourceText
-        }))
-      );
+      let translations: Record<string, string>;
+      try {
+        translations = await dependencies.requestTranslations(
+          candidates.map((candidate) => ({
+            blockId: candidate.blockId,
+            sourceText: candidate.sourceText
+          }))
+        );
+      } catch (error) {
+        candidates.forEach((candidate) => stateStore.set(candidate.blockId, "failed"));
+        updateStatusPill(statusPill, {
+          state: "error",
+          translatedBlockCount,
+          failedBlockCount: candidates.length,
+          errorMessage: error instanceof Error ? error.message : "Translation request failed."
+        });
+        await dependencies.reportPageState({
+          enabled: active,
+          translatedBlockCount,
+          pendingRequestCount: 0
+        });
+        return;
+      }
 
       for (const candidate of candidates) {
         const translationText = translations[candidate.blockId];
