@@ -111,3 +111,25 @@ h1 {
 .status[data-state="error"] {
   color: #8a1f1f;
 }
+
+[data-role="toast"] {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10;
+  max-width: min(360px, calc(100vw - 48px));
+  border: 1px solid rgba(21, 82, 63, 0.18);
+  border-radius: 16px;
+  padding: 14px 16px;
+  color: #103d30;
+  background: #e9fff6;
+  box-shadow: 0 18px 48px rgba(63, 44, 23, 0.16);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+[data-role="toast"][data-state="error"] {
+  border-color: rgba(138, 31, 31, 0.18);
+  color: #6d1818;
+  background: #fff0ed;
+}

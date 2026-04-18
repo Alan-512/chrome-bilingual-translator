@@ -92,5 +92,28 @@ describe("mountOptionsPage", () => {
     expect(savedConfig.apiOrigin).toBe("https://api.test.dev");
     expect(savedConfig.translateShortContentBlocks).toBe(false);
     expect(document.querySelector("[data-role='status']")?.textContent).toContain("saved");
+    expect(document.querySelector("[data-role='toast']")?.textContent).toContain("Configuration saved");
+    expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("success");
+  });
+
+  it("shows a visible error toast when API origin permission is denied", async () => {
+    const storage = createMemoryStorageArea();
+
+    await mountOptionsPage(document, {
+      storageArea: storage,
+      requestApiOriginPermission: async () => false
+    });
+
+    (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value =
+      "https://api.test.dev/v1/chat/completions";
+    (document.querySelector("[name='apiKey']") as HTMLInputElement).value = "secret";
+    (document.querySelector("[name='model']") as HTMLInputElement).value = "gpt-5-mini";
+
+    document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(document.querySelector("[data-role='toast']")?.textContent).toContain("permission was denied");
+    expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("error");
   });
 });

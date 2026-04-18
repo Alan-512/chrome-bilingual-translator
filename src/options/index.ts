@@ -37,6 +37,32 @@ function setStatus(element: HTMLElement, message: string, variant: "neutral" | "
   element.dataset.state = variant;
 }
 
+let toastTimeoutId: number | undefined;
+
+function showToast(doc: Document, message: string, variant: "success" | "error") {
+  const existingToast = doc.querySelector<HTMLElement>("[data-role='toast']");
+  const toast = existingToast ?? doc.createElement("div");
+
+  toast.dataset.role = "toast";
+  toast.dataset.state = variant;
+  toast.setAttribute("role", "status");
+  toast.setAttribute("aria-live", "polite");
+  toast.textContent = message;
+
+  if (!existingToast) {
+    doc.body.appendChild(toast);
+  }
+
+  if (toastTimeoutId) {
+    doc.defaultView?.clearTimeout(toastTimeoutId);
+  }
+
+  toastTimeoutId = doc.defaultView?.setTimeout(() => {
+    toast.remove();
+    toastTimeoutId = undefined;
+  }, 3000);
+}
+
 function collectFormInput(controls: OptionsFormControls): PersistedExtensionConfigInput {
   return {
     apiBaseUrl: controls.apiBaseUrl.value.trim(),
@@ -71,11 +97,13 @@ export async function mountOptionsPage(
 
     if (nextConfig.apiOrigin && !permissionGranted) {
       setStatus(controls.status, "API origin permission was denied.", "error");
+      showToast(doc, "API origin permission was denied.", "error");
       return;
     }
 
     await saveExtensionConfig(dependencies.storageArea, nextConfig);
     setStatus(controls.status, "Configuration saved.", "success");
+    showToast(doc, "Configuration saved.", "success");
   });
 }
 
