@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome Bilingual Translator",
+  "version": "0.1.0",
+  "description": "Translate webpage reading content into Simplified Chinese while preserving the original text.",
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "options_page": "dist/options.html",
+  "permissions": ["contextMenus", "storage", "activeTab", "scripting"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"]
+}

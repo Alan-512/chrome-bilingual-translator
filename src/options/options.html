@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chrome Bilingual Translator Options</title>
+    <link rel="stylesheet" href="./options.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="panel">
+        <p class="eyebrow">Chrome Bilingual Translator</p>
+        <h1>Options</h1>
+        <p class="description">Configure the API endpoint and translation defaults for this extension.</p>
+        <form class="form" data-role="options-form">
+          <label class="field">
+            <span>API Base URL</span>
+            <input name="apiBaseUrl" type="url" autocomplete="off" placeholder="https://api.example.com/v1/chat/completions" />
+          </label>
+          <label class="field">
+            <span>API Key</span>
+            <input name="apiKey" type="password" autocomplete="off" placeholder="sk-..." />
+          </label>
+          <label class="field">
+            <span>Model</span>
+            <input name="model" type="text" autocomplete="off" placeholder="gpt-5-mini" />
+          </label>
+          <label class="toggle">
+            <input name="translateTitles" type="checkbox" />
+            <span>Translate titles</span>
+          </label>
+          <label class="toggle">
+            <input name="translateShortContentBlocks" type="checkbox" />
+            <span>Translate short content blocks</span>
+          </label>
+          <div class="actions">
+            <button class="button" type="submit">Save settings</button>
+          </div>
+        </form>
+        <p class="status" data-role="status">Loading…</p>
+      </section>
+    </main>
+    <script src="./index.ts" type="module"></script>
+  </body>
+</html>

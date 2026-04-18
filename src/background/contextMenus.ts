@@ -1,0 +1,45 @@
+import { type TabSessionRecord } from "./tabSessionStore";
+
+export const MENU_ID_TOGGLE_TRANSLATION = "toggle-page-translation";
+
+export type ContextMenuItem = {
+  id: string;
+  title: string;
+  contexts: chrome.contextMenus.ContextType[];
+};
+
+export type ContextMenusCreateApi = {
+  create(item: ContextMenuItem): void | Promise<void>;
+};
+
+export type ContextMenusUpdateApi = {
+  update(id: string, update: Pick<ContextMenuItem, "title">): void | Promise<void>;
+};
+
+export function getToggleMenuTitle(session: Pick<TabSessionRecord, "enabled">): string {
+  return session.enabled ? "Show original text" : "Translate current webpage";
+}
+
+export function buildToggleMenuItem(session: Pick<TabSessionRecord, "enabled">): ContextMenuItem {
+  return {
+    id: MENU_ID_TOGGLE_TRANSLATION,
+    title: getToggleMenuTitle(session),
+    contexts: ["page"]
+  };
+}
+
+export async function registerToggleMenu(
+  api: ContextMenusCreateApi,
+  session: Pick<TabSessionRecord, "enabled">
+): Promise<void> {
+  await api.create(buildToggleMenuItem(session));
+}
+
+export async function refreshToggleMenu(
+  api: ContextMenusUpdateApi,
+  session: Pick<TabSessionRecord, "enabled">
+): Promise<void> {
+  await api.update(MENU_ID_TOGGLE_TRANSLATION, {
+    title: getToggleMenuTitle(session)
+  });
+}

@@ -1,0 +1,59 @@
+export const TARGET_LANGUAGE = "zh-CN" as const;
+
+export type PersistedExtensionConfigInput = {
+  apiBaseUrl: string;
+  apiKey: string;
+  model: string;
+  translateTitles: boolean;
+  translateShortContentBlocks: boolean;
+};
+
+export type ExtensionConfig = PersistedExtensionConfigInput & {
+  apiOrigin: string;
+  targetLanguage: typeof TARGET_LANGUAGE;
+};
+
+export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
+  apiBaseUrl: "",
+  apiOrigin: "",
+  apiKey: "",
+  model: "",
+  translateTitles: true,
+  translateShortContentBlocks: true,
+  targetLanguage: TARGET_LANGUAGE
+};
+
+export function normalizeApiBaseUrlToOrigin(apiBaseUrl: string): string {
+  try {
+    const url = new URL(apiBaseUrl);
+    return url.origin;
+  } catch {
+    return "";
+  }
+}
+
+export function buildPersistedConfigRecord(input: PersistedExtensionConfigInput): ExtensionConfig {
+  return {
+    ...input,
+    apiOrigin: normalizeApiBaseUrlToOrigin(input.apiBaseUrl),
+    targetLanguage: TARGET_LANGUAGE
+  };
+}
+
+export function getMissingConfigFields(config: ExtensionConfig): Array<keyof PersistedExtensionConfigInput> {
+  const missingFields: Array<keyof PersistedExtensionConfigInput> = [];
+
+  if (!config.apiBaseUrl.trim()) {
+    missingFields.push("apiBaseUrl");
+  }
+
+  if (!config.apiKey.trim()) {
+    missingFields.push("apiKey");
+  }
+
+  if (!config.model.trim()) {
+    missingFields.push("model");
+  }
+
+  return missingFields;
+}
