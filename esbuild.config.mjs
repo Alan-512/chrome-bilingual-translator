@@ -2,9 +2,10 @@ import { build, context } from "esbuild";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 const watch = process.argv.includes("--watch");
-const projectRoot = path.resolve("/mnt/d/project/chrome-bilingual-translator");
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(projectRoot, "dist");
 
 const bundleEntries = [
