@@ -2,7 +2,12 @@ import { PersistentTranslationCache } from "../shared/cacheStore";
 import { loadExtensionConfig } from "../shared/storage";
 import { createChromeStorageArea } from "../shared/storage";
 import { createTranslatorClient } from "../shared/translatorClient";
-import { MENU_ID_TOGGLE_TRANSLATION, refreshToggleMenu, registerToggleMenu } from "./contextMenus";
+import {
+  MENU_ID_TOGGLE_TRANSLATION,
+  refreshToggleMenu,
+  registerOptionalContextMenuShownListener,
+  registerToggleMenu
+} from "./contextMenus";
 import { createBackgroundMessageRouter } from "./messageRouter";
 import { createChromeApiOriginPermissionRequester } from "./permissionManager";
 import { SessionStorageTabSessionStore } from "./tabSessionStore";
@@ -50,7 +55,7 @@ async function bootstrap() {
     void ensureMenuRegistered();
   });
 
-  chrome.contextMenus.onShown.addListener((_info, tab) => {
+  registerOptionalContextMenuShownListener(chrome.contextMenus, (_info, tab) => {
     const tabId = tab?.id;
     if (typeof tabId !== "number") {
       return;

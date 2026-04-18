@@ -16,6 +16,12 @@ export type ContextMenusUpdateApi = {
   update(id: string, update: Pick<ContextMenuItem, "title">): void | Promise<void>;
 };
 
+export type ContextMenusOnShownApi = {
+  onShown?: {
+    addListener(listener: (info: unknown, tab?: chrome.tabs.Tab) => void): void;
+  };
+};
+
 export function getToggleMenuTitle(session: Pick<TabSessionRecord, "enabled">): string {
   return session.enabled ? "Show original text" : "Translate current webpage";
 }
@@ -42,4 +48,11 @@ export async function refreshToggleMenu(
   await api.update(MENU_ID_TOGGLE_TRANSLATION, {
     title: getToggleMenuTitle(session)
   });
+}
+
+export function registerOptionalContextMenuShownListener(
+  api: ContextMenusOnShownApi,
+  listener: (info: unknown, tab?: chrome.tabs.Tab) => void
+): void {
+  api.onShown?.addListener(listener);
 }

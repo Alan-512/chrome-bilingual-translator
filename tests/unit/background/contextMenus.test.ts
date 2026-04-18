@@ -4,6 +4,7 @@ import {
   MENU_ID_TOGGLE_TRANSLATION,
   buildToggleMenuItem,
   getToggleMenuTitle,
+  registerOptionalContextMenuShownListener,
   registerToggleMenu,
   refreshToggleMenu,
   type ContextMenuItem
@@ -73,5 +74,28 @@ describe("context menu api integration", () => {
         }
       }
     ]);
+  });
+
+  it("skips the optional onShown listener when the Chrome API does not expose it", () => {
+    expect(() => {
+      registerOptionalContextMenuShownListener({}, () => {});
+    }).not.toThrow();
+  });
+
+  it("registers the optional onShown listener when the Chrome API exposes it", () => {
+    let listener: unknown;
+
+    registerOptionalContextMenuShownListener(
+      {
+        onShown: {
+          addListener(nextListener: unknown) {
+            listener = nextListener;
+          }
+        }
+      },
+      () => {}
+    );
+
+    expect(listener).toBeTypeOf("function");
   });
 });
