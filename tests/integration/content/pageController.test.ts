@@ -281,4 +281,17 @@ describe("pageController", () => {
     expect(pill.textContent).toContain("Missing required configuration: API key");
     expect(document.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
   });
+
+  it("ignores invalidated extension context errors raised while reporting page state", async () => {
+    const controller = createPageController(document, {
+      requestTranslations: async (blocks) =>
+        Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`])),
+      reportPageState: async () => {
+        throw new Error("Extension context invalidated.");
+      },
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await expect(controller.activate()).resolves.toBeUndefined();
+  });
 });

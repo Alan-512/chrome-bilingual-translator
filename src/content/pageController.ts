@@ -26,6 +26,25 @@ type PageControllerDependencies = {
   isElementReadyForTranslation?: (element: HTMLElement) => boolean;
 };
 
+async function safeReportPageState(
+  dependencies: PageControllerDependencies,
+  state: {
+    enabled: boolean;
+    translatedBlockCount: number;
+    pendingRequestCount: number;
+  }
+) {
+  try {
+    await dependencies.reportPageState(state);
+  } catch (error) {
+    if (error instanceof Error && /Extension context invalidated/i.test(error.message)) {
+      return;
+    }
+
+    throw error;
+  }
+}
+
 function isElementNearViewport(element: HTMLElement) {
   const rect = element.getBoundingClientRect();
   const viewportHeight = element.ownerDocument.defaultView?.innerHeight ?? 0;
@@ -79,7 +98,7 @@ export function createPageController(doc: Document, dependencies: PageController
     try {
       if (candidates.length === 0) {
         updateStatusPill(statusPill, { state: "translated", translatedBlockCount });
-        await dependencies.reportPageState({
+        await safeReportPageState(dependencies, {
           enabled: active,
           translatedBlockCount,
           pendingRequestCount: 0
@@ -115,7 +134,7 @@ export function createPageController(doc: Document, dependencies: PageController
           failedBlockCount: candidates.length,
           errorMessage: error instanceof Error ? error.message : "Translation request failed."
         });
-        await dependencies.reportPageState({
+        await safeReportPageState(dependencies, {
           enabled: active,
           translatedBlockCount,
           pendingRequestCount: 0
@@ -143,7 +162,7 @@ export function createPageController(doc: Document, dependencies: PageController
         state: "translated",
         translatedBlockCount
       });
-      await dependencies.reportPageState({
+      await safeReportPageState(dependencies, {
         enabled: active,
         translatedBlockCount,
         pendingRequestCount: 0
@@ -164,7 +183,7 @@ export function createPageController(doc: Document, dependencies: PageController
     async activate() {
       if (!active) {
         active = true;
-        await dependencies.reportPageState({
+        await safeReportPageState(dependencies, {
           enabled: true,
           translatedBlockCount,
           pendingRequestCount: 0
@@ -218,7 +237,7 @@ export function createPageController(doc: Document, dependencies: PageController
       removeRenderedTranslations(doc);
       stateStore.clear();
       updateStatusPill(statusPill, { state: "idle", translatedBlockCount: 0 });
-      await dependencies.reportPageState({
+      await safeReportPageState(dependencies, {
         enabled: false,
         translatedBlockCount,
         pendingRequestCount: 0
