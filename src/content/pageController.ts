@@ -64,7 +64,7 @@ function chunkBlocks<T>(items: T[], chunkSize: number) {
   return chunks;
 }
 
-async function requestTranslationsRobust(
+async function requestBatchRobust(
   dependencies: PageControllerDependencies,
   blocks: Array<{ blockId: string; sourceText: string }>
 ) {
@@ -72,24 +72,21 @@ async function requestTranslationsRobust(
   const failedBlockIds = new Set<string>();
   let lastError: Error | null = null;
 
-  for (const batch of chunkBlocks(blocks, TRANSLATION_BATCH_SIZE)) {
-    try {
-      const batchTranslations = await dependencies.requestTranslations(batch);
+  try {
+    const batchTranslations = await dependencies.requestTranslations(blocks);
 
-      for (const block of batch) {
-        const translationText = batchTranslations[block.blockId];
-        if (translationText) {
-          translations[block.blockId] = translationText;
-        } else {
-          failedBlockIds.add(block.blockId);
-        }
+    for (const block of blocks) {
+      const translationText = batchTranslations[block.blockId];
+      if (translationText) {
+        translations[block.blockId] = translationText;
+      } else {
+        failedBlockIds.add(block.blockId);
       }
-      continue;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error("Translation request failed.");
     }
+  } catch (error) {
+    lastError = error instanceof Error ? error : new Error("Translation request failed.");
 
-    for (const block of batch) {
+    for (const block of blocks) {
       try {
         const singleTranslation = await dependencies.requestTranslations([block]);
         const translationText = singleTranslation[block.blockId];
@@ -98,8 +95,8 @@ async function requestTranslationsRobust(
         } else {
           failedBlockIds.add(block.blockId);
         }
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error("Translation request failed.");
+      } catch (singleError) {
+        lastError = singleError instanceof Error ? singleError : new Error("Translation request failed.");
         failedBlockIds.add(block.blockId);
       }
     }
@@ -167,46 +164,77 @@ export function createPageController(doc: Document, dependencies: PageController
       }
 
       observerCoordinator.observeCandidates(candidates.map((candidate) => candidate.element));
-      candidates.forEach((candidate) => {
-        stateStore.set(candidate.blockId, "pending");
-        renderTranslationLoadingBelow(candidate.element, {
-          blockId: candidate.blockId
+      const totalFailedBlockIds = new Set<string>();
+      let lastError: Error | null = null;
+
+      for (const candidateBatch of chunkBlocks(candidates, TRANSLATION_BATCH_SIZE)) {
+        candidateBatch.forEach((candidate) => {
+          stateStore.set(candidate.blockId, "pending");
+          renderTranslationLoadingBelow(candidate.element, {
+            blockId: candidate.blockId
+          });
         });
-      });
-      updateStatusPill(statusPill, { state: "translating", translatedBlockCount });
+        updateStatusPill(statusPill, { state: "translating", translatedBlockCount });
+        await safeReportPageState(dependencies, {
+          enabled: active,
+          translatedBlockCount,
+          pendingRequestCount: candidateBatch.length
+        });
 
-      const { translations, failedBlockIds, lastError } = await requestTranslationsRobust(
-        dependencies,
-        candidates.map((candidate) => ({
-          blockId: candidate.blockId,
-          sourceText: candidate.sourceText
-        }))
-      );
+        const batchResult = await requestBatchRobust(
+          dependencies,
+          candidateBatch.map((candidate) => ({
+            blockId: candidate.blockId,
+            sourceText: candidate.sourceText
+          }))
+        );
+        lastError = batchResult.lastError ?? lastError;
 
-      for (const candidate of candidates) {
-        const translationText = translations[candidate.blockId];
-        if (!translationText) {
-          stateStore.set(candidate.blockId, "failed");
-          removeRenderedTranslationBlock(doc, candidate.blockId);
-          failedBlockIds.add(candidate.blockId);
-          continue;
+        for (const candidate of candidateBatch) {
+          const translationText = batchResult.translations[candidate.blockId];
+          if (!translationText) {
+            stateStore.set(candidate.blockId, "failed");
+            removeRenderedTranslationBlock(doc, candidate.blockId);
+            totalFailedBlockIds.add(candidate.blockId);
+            continue;
+          }
+
+          renderTranslationBelow(candidate.element, {
+            blockId: candidate.blockId,
+            translationText
+          });
+          stateStore.set(candidate.blockId, "translated");
+          translatedBlockCount += 1;
         }
 
-        renderTranslationBelow(candidate.element, {
-          blockId: candidate.blockId,
-          translationText
+        updateStatusPill(
+          statusPill,
+          totalFailedBlockIds.size > 0
+            ? {
+                state: "error",
+                translatedBlockCount,
+                failedBlockCount: totalFailedBlockIds.size,
+                errorMessage: lastError?.message
+              }
+            : {
+                state: "translating",
+                translatedBlockCount
+              }
+        );
+        await safeReportPageState(dependencies, {
+          enabled: active,
+          translatedBlockCount,
+          pendingRequestCount: 0
         });
-        stateStore.set(candidate.blockId, "translated");
-        translatedBlockCount += 1;
       }
 
       updateStatusPill(
         statusPill,
-        failedBlockIds.size > 0
+        totalFailedBlockIds.size > 0
           ? {
               state: "error",
               translatedBlockCount,
-              failedBlockCount: failedBlockIds.size,
+              failedBlockCount: totalFailedBlockIds.size,
               errorMessage: lastError?.message
             }
           : {

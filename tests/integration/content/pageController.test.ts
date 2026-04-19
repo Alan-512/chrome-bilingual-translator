@@ -26,6 +26,12 @@ function mockElementRect(element: HTMLElement, top: number, bottom: number) {
   } as DOMRect);
 }
 
+async function settlePromises(iterations = 6) {
+  for (let index = 0; index < iterations; index += 1) {
+    await Promise.resolve();
+  }
+}
+
 describe("pageController", () => {
   beforeEach(() => {
     document.body.innerHTML = `
@@ -57,6 +63,11 @@ describe("pageController", () => {
       pendingRequestCount: 0
     });
     expect(reportPageState).toHaveBeenNthCalledWith(2, {
+      enabled: true,
+      translatedBlockCount: 0,
+      pendingRequestCount: 2
+    });
+    expect(reportPageState).toHaveBeenNthCalledWith(3, {
       enabled: true,
       translatedBlockCount: 2,
       pendingRequestCount: 0
@@ -230,13 +241,13 @@ describe("pageController", () => {
     });
 
     const activationPromise = controller.activate();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settlePromises();
 
     const loadingBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
     expect(loadingBlocks).toHaveLength(2);
     expect(loadingBlocks[0]?.getAttribute("data-bilingual-translator-state")).toBe("loading");
     expect(loadingBlocks[0]?.textContent).toContain("Translating");
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
 
     const pendingBlocks = requestTranslations.mock.calls[0]?.[0] as Array<{ blockId: string; sourceText: string }>;
     resolveTranslations?.(
@@ -248,6 +259,70 @@ describe("pageController", () => {
     const translatedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
     expect(translatedBlocks[0]?.getAttribute("data-bilingual-translator-state")).toBe("translated");
     expect(translatedBlocks[0]?.textContent).toContain("ZH:");
+    await controller.deactivate();
+  });
+
+  it("renders completed batches before later batches finish", async () => {
+    document.body.innerHTML = `
+      <main>
+        ${Array.from({ length: 9 }, (_, index) => `<p>Paragraph ${index + 1} with enough content to translate well.</p>`).join("")}
+      </main>
+    `;
+
+    let resolveFirstBatch: ((value: Record<string, string>) => void) | undefined;
+    let resolveSecondBatch: ((value: Record<string, string>) => void) | undefined;
+    let batchCallCount = 0;
+
+    const requestTranslations = vi.fn((blocks: Array<{ blockId: string; sourceText: string }>) => {
+      batchCallCount += 1;
+
+      if (batchCallCount === 1) {
+        return new Promise<Record<string, string>>((resolve) => {
+          resolveFirstBatch = resolve;
+        });
+      }
+
+      return new Promise<Record<string, string>>((resolve) => {
+        resolveSecondBatch = resolve;
+      });
+    });
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    const activationPromise = controller.activate();
+    await settlePromises();
+
+    let renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(renderedBlocks).toHaveLength(8);
+    expect(renderedBlocks.every((node) => node.getAttribute("data-bilingual-translator-state") === "loading")).toBe(
+      true
+    );
+
+    const firstBatchBlocks = requestTranslations.mock.calls[0]?.[0] as Array<{ blockId: string; sourceText: string }>;
+    resolveFirstBatch?.(
+      Object.fromEntries(firstBatchBlocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    await settlePromises();
+
+    renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(renderedBlocks.filter((node) => node.getAttribute("data-bilingual-translator-state") === "translated")).toHaveLength(8);
+    expect(renderedBlocks.filter((node) => node.getAttribute("data-bilingual-translator-state") === "loading")).toHaveLength(1);
+
+    const secondBatchBlocks = requestTranslations.mock.calls[1]?.[0] as Array<{ blockId: string; sourceText: string }>;
+    resolveSecondBatch?.(
+      Object.fromEntries(secondBatchBlocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    await activationPromise;
+
+    renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(renderedBlocks).toHaveLength(9);
+    expect(renderedBlocks.every((node) => node.textContent?.includes("ZH:"))).toBe(true);
     await controller.deactivate();
   });
 
