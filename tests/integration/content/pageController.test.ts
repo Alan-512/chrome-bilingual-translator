@@ -262,10 +262,10 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
-  it("renders completed batches before later batches finish", async () => {
+  it("renders completed batches before later batches finish with twelve blocks per batch", async () => {
     document.body.innerHTML = `
       <main>
-        ${Array.from({ length: 9 }, (_, index) => `<p>Paragraph ${index + 1} with enough content to translate well.</p>`).join("")}
+        ${Array.from({ length: 13 }, (_, index) => `<p>Paragraph ${index + 1} with enough content to translate well.</p>`).join("")}
       </main>
     `;
 
@@ -297,7 +297,7 @@ describe("pageController", () => {
     await settlePromises();
 
     let renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
-    expect(renderedBlocks).toHaveLength(8);
+    expect(renderedBlocks).toHaveLength(12);
     expect(renderedBlocks.every((node) => node.getAttribute("data-bilingual-translator-state") === "loading")).toBe(
       true
     );
@@ -310,7 +310,7 @@ describe("pageController", () => {
     await settlePromises();
 
     renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
-    expect(renderedBlocks.filter((node) => node.getAttribute("data-bilingual-translator-state") === "translated")).toHaveLength(8);
+    expect(renderedBlocks.filter((node) => node.getAttribute("data-bilingual-translator-state") === "translated")).toHaveLength(12);
     expect(renderedBlocks.filter((node) => node.getAttribute("data-bilingual-translator-state") === "loading")).toHaveLength(1);
 
     const secondBatchBlocks = requestTranslations.mock.calls[1]?.[0] as Array<{ blockId: string; sourceText: string }>;
@@ -321,7 +321,7 @@ describe("pageController", () => {
     await activationPromise;
 
     renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
-    expect(renderedBlocks).toHaveLength(9);
+    expect(renderedBlocks).toHaveLength(13);
     expect(renderedBlocks.every((node) => node.textContent?.includes("ZH:"))).toBe(true);
     await controller.deactivate();
   });

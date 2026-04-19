@@ -26,7 +26,7 @@ type PageControllerDependencies = {
   isElementReadyForTranslation?: (element: HTMLElement) => boolean;
 };
 
-const TRANSLATION_BATCH_SIZE = 8;
+const TRANSLATION_BATCH_SIZE = 12;
 
 async function safeReportPageState(
   dependencies: PageControllerDependencies,
