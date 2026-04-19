@@ -166,8 +166,25 @@ function buildApiTestRequest(config: ExtensionConfig) {
   };
 }
 
+function isAbortError(error: unknown) {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return true;
+  }
+
+  if (error instanceof Error && error.name === "AbortError") {
+    return true;
+  }
+
+  return false;
+}
+
+function toTimeoutErrorMessage(timeoutMs: number) {
+  const seconds = timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)}s` : `${timeoutMs}ms`;
+  return `API request timed out after ${seconds}.`;
+}
+
 export function createTranslatorClient(options: CreateTranslatorClientOptions): TranslatorClient {
-  const timeoutMs = options.timeoutMs ?? 15_000;
+  const timeoutMs = options.timeoutMs ?? 30_000;
 
   return {
     async translateBlocks({ config, blocks }) {
@@ -246,6 +263,12 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           ...result,
           ...translatedBlocks
         };
+      } catch (error) {
+        if (controller.signal.aborted || isAbortError(error)) {
+          throw new Error(toTimeoutErrorMessage(timeoutMs));
+        }
+
+        throw error;
       } finally {
         clearTimeout(timeout);
       }
@@ -270,6 +293,12 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
         if (!response.ok) {
           throw new Error(await readApiErrorMessage(response));
         }
+      } catch (error) {
+        if (controller.signal.aborted || isAbortError(error)) {
+          throw new Error(toTimeoutErrorMessage(timeoutMs));
+        }
+
+        throw error;
       } finally {
         clearTimeout(timeout);
       }

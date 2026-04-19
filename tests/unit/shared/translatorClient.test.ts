@@ -203,4 +203,32 @@ describe("translator client", () => {
 
     expect(result).toEqual({ alpha: "第一段" });
   });
+
+  it("surfaces a readable timeout error instead of the raw abort signal message", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      return await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new Error("signal is aborted without reason"));
+        });
+      });
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea()),
+      timeoutMs: 10
+    });
+
+    await expect(
+      client.testConnection({
+        config: buildPersistedConfigRecord({
+          apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+          apiKey: "secret-key",
+          model: "ep-20260321184346-rlw84",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        })
+      })
+    ).rejects.toThrow(/timed out after 10ms/i);
+  });
 });
