@@ -13,6 +13,7 @@ describe("status pill", () => {
     });
 
     expect(document.querySelectorAll("[data-bilingual-translator-pill='true']")).toHaveLength(1);
+    expect(pill.hidden).toBe(true);
     expect(pill.textContent).toContain("12");
   });
 

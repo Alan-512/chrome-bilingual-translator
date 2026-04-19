@@ -20,19 +20,10 @@ export function ensureStatusPill(doc: Document): HTMLElement {
     return existing;
   }
 
-  const pill = doc.createElement("div");
+  const pill = doc.createElement("span");
   pill.setAttribute(PILL_ATTRIBUTE, "true");
-  pill.style.position = "fixed";
-  pill.style.top = "16px";
-  pill.style.right = "16px";
-  pill.style.zIndex = "2147483647";
-  pill.style.padding = "8px 12px";
-  pill.style.borderRadius = "999px";
-  pill.style.background = "rgba(28, 32, 41, 0.92)";
-  pill.style.color = "#fff";
-  pill.style.fontSize = "12px";
-  pill.style.fontWeight = "700";
-  pill.textContent = "Idle";
+  pill.hidden = true;
+  pill.setAttribute("aria-hidden", "true");
   doc.body.appendChild(pill);
   return pill;
 }
