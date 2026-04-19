@@ -1,4 +1,6 @@
 import {
+  DEFAULT_OPENAI_PROVIDER,
+  GEMINI_PROVIDER,
   buildPersistedConfigRecord,
   getApiBaseUrlSecurityError,
   normalizeApiBaseUrlToOrigin,
@@ -15,6 +17,7 @@ type OptionsPageDependencies = {
 type OptionsFormControls = {
   form: HTMLFormElement;
   testApi: HTMLButtonElement;
+  provider: HTMLSelectElement;
   apiBaseUrl: HTMLInputElement;
   apiKey: HTMLInputElement;
   model: HTMLInputElement;
@@ -27,6 +30,7 @@ type OptionsFormControls = {
 function queryControls(doc: Document): OptionsFormControls {
   const form = doc.querySelector<HTMLFormElement>("[data-role='options-form']");
   const testApi = doc.querySelector<HTMLButtonElement>("[data-role='test-api']");
+  const provider = doc.querySelector<HTMLSelectElement>("[name='provider']");
   const apiBaseUrl = doc.querySelector<HTMLInputElement>("[name='apiBaseUrl']");
   const apiKey = doc.querySelector<HTMLInputElement>("[name='apiKey']");
   const model = doc.querySelector<HTMLInputElement>("[name='model']");
@@ -38,6 +42,7 @@ function queryControls(doc: Document): OptionsFormControls {
   if (
     !form ||
     !testApi ||
+    !provider ||
     !apiBaseUrl ||
     !apiKey ||
     !model ||
@@ -49,7 +54,18 @@ function queryControls(doc: Document): OptionsFormControls {
     throw new Error("Options page controls are missing.");
   }
 
-  return { form, testApi, apiBaseUrl, apiKey, model, translateTitles, translateShortContentBlocks, status, apiOriginPreview };
+  return {
+    form,
+    testApi,
+    provider,
+    apiBaseUrl,
+    apiKey,
+    model,
+    translateTitles,
+    translateShortContentBlocks,
+    status,
+    apiOriginPreview
+  };
 }
 
 function setStatus(element: HTMLElement, message: string, variant: "neutral" | "success" | "error" = "neutral") {
@@ -85,6 +101,7 @@ function showToast(doc: Document, message: string, variant: "success" | "error")
 
 function collectFormInput(controls: OptionsFormControls): PersistedExtensionConfigInput {
   return {
+    provider: controls.provider.value === GEMINI_PROVIDER ? GEMINI_PROVIDER : DEFAULT_OPENAI_PROVIDER,
     apiBaseUrl: controls.apiBaseUrl.value.trim(),
     apiKey: controls.apiKey.value.trim(),
     model: controls.model.value.trim(),
@@ -96,6 +113,20 @@ function collectFormInput(controls: OptionsFormControls): PersistedExtensionConf
 function updateApiOriginPreview(controls: OptionsFormControls) {
   const origin = normalizeApiBaseUrlToOrigin(controls.apiBaseUrl.value.trim());
   controls.apiOriginPreview.textContent = origin ? `Requests will be sent to ${origin}` : "Enter a valid API URL.";
+}
+
+function applyProviderPreset(controls: OptionsFormControls) {
+  if (controls.provider.value === GEMINI_PROVIDER) {
+    if (!controls.apiBaseUrl.value.trim()) {
+      controls.apiBaseUrl.value = "https://generativelanguage.googleapis.com/v1beta";
+    }
+
+    if (!controls.model.value.trim()) {
+      controls.model.value = "gemini-3.1-flash-lite-preview";
+    }
+  }
+
+  updateApiOriginPreview(controls);
 }
 
 async function testApiConfiguration(
@@ -146,6 +177,7 @@ export async function mountOptionsPage(
   const controls = queryControls(doc);
   const savedConfig = await loadExtensionConfig(dependencies.storageArea);
 
+  controls.provider.value = savedConfig.provider;
   controls.apiBaseUrl.value = savedConfig.apiBaseUrl;
   controls.apiKey.value = savedConfig.apiKey;
   controls.model.value = savedConfig.model;
@@ -156,6 +188,10 @@ export async function mountOptionsPage(
 
   controls.apiBaseUrl.addEventListener("input", () => {
     updateApiOriginPreview(controls);
+  });
+
+  controls.provider.addEventListener("change", () => {
+    applyProviderPreset(controls);
   });
 
   controls.testApi.addEventListener("click", () => {

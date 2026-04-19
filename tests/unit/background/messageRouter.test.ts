@@ -12,6 +12,7 @@ describe("background message router", () => {
     const router = createBackgroundMessageRouter({
       loadConfig: async () =>
         buildPersistedConfigRecord({
+          provider: "openai-compatible",
           apiBaseUrl: "",
           apiKey: "",
           model: "",
@@ -30,6 +31,7 @@ describe("background message router", () => {
       {
         type: "api/test",
         config: {
+          provider: "openai-compatible",
           apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
           apiKey: "secret-key",
           model: "ep-20260321184346-rlw84",
@@ -56,6 +58,7 @@ describe("background message router", () => {
     const router = createBackgroundMessageRouter({
       loadConfig: async () =>
         buildPersistedConfigRecord({
+          provider: "openai-compatible",
           apiBaseUrl: "https://api.example.com/v1/chat/completions",
           apiKey: "secret-key",
           model: "gpt-5-mini",
@@ -94,6 +97,7 @@ describe("background message router", () => {
     const router = createBackgroundMessageRouter({
       loadConfig: async () =>
         buildPersistedConfigRecord({
+          provider: "openai-compatible",
           apiBaseUrl: "",
           apiKey: "",
           model: "",
@@ -126,6 +130,7 @@ describe("background message router", () => {
     const router = createBackgroundMessageRouter({
       loadConfig: async () =>
         buildPersistedConfigRecord({
+          provider: "openai-compatible",
           apiBaseUrl: "http://api.example.com/v1/chat/completions",
           apiKey: "secret-key",
           model: "gpt-5-mini",

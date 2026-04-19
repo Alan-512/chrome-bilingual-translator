@@ -1,6 +1,12 @@
 export const TARGET_LANGUAGE = "zh-CN" as const;
 
+export const DEFAULT_OPENAI_PROVIDER = "openai-compatible" as const;
+export const GEMINI_PROVIDER = "google-gemini" as const;
+
+export type ProviderType = typeof DEFAULT_OPENAI_PROVIDER | typeof GEMINI_PROVIDER;
+
 export type PersistedExtensionConfigInput = {
+  provider: ProviderType;
   apiBaseUrl: string;
   apiKey: string;
   model: string;
@@ -14,6 +20,7 @@ export type ExtensionConfig = PersistedExtensionConfigInput & {
 };
 
 export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
+  provider: DEFAULT_OPENAI_PROVIDER,
   apiBaseUrl: "",
   apiOrigin: "",
   apiKey: "",
@@ -63,6 +70,10 @@ export function getApiBaseUrlSecurityError(apiBaseUrl: string): string | null {
 
 export function getMissingConfigFields(config: ExtensionConfig): Array<keyof PersistedExtensionConfigInput> {
   const missingFields: Array<keyof PersistedExtensionConfigInput> = [];
+
+  if (!config.provider.trim()) {
+    missingFields.push("provider");
+  }
 
   if (!config.apiBaseUrl.trim()) {
     missingFields.push("apiBaseUrl");

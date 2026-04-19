@@ -11,6 +11,13 @@ function renderOptionsDom() {
       <section class="panel">
         <form data-role="options-form">
           <label>
+            Provider
+            <select name="provider">
+              <option value="openai-compatible">OpenAI Compatible</option>
+              <option value="google-gemini">Google Gemini</option>
+            </select>
+          </label>
+          <label>
             API Base URL
             <input name="apiBaseUrl" type="url" />
           </label>
@@ -56,6 +63,7 @@ describe("mountOptionsPage", () => {
       extensionConfig: {
         apiBaseUrl: "https://api.example.com/v1",
         apiOrigin: "https://api.example.com",
+        provider: "openai-compatible",
         apiKey: "abc123",
         model: "gpt-test",
         translateTitles: false,
@@ -73,6 +81,7 @@ describe("mountOptionsPage", () => {
     expect((document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value).toBe(
       "https://api.example.com/v1"
     );
+    expect((document.querySelector("[name='provider']") as HTMLSelectElement).value).toBe("openai-compatible");
     expect((document.querySelector("[name='apiKey']") as HTMLInputElement).value).toBe("abc123");
     expect((document.querySelector("[name='model']") as HTMLInputElement).value).toBe("gpt-test");
     expect((document.querySelector("[name='translateTitles']") as HTMLInputElement).checked).toBe(false);
@@ -205,6 +214,7 @@ describe("mountOptionsPage", () => {
     const savedConfig = await loadExtensionConfig(storage);
     expect(savedConfig.apiBaseUrl).toBe("https://saved.example.com/v1/chat/completions");
     expect(observedConfig).toEqual({
+      provider: "openai-compatible",
       apiBaseUrl: "https://api.test.dev/v1/chat/completions",
       apiKey: "test-key",
       model: "test-model",
@@ -264,5 +274,26 @@ describe("mountOptionsPage", () => {
 
     expect(observedConfig?.apiBaseUrl).toBe("https://ark.cn-beijing.volces.com/api/v3");
     expect(document.querySelector("[data-role='toast']")?.textContent).toContain("API connection succeeded");
+  });
+
+  it("applies Google Gemini presets when provider changes", async () => {
+    const storage = createMemoryStorageArea();
+
+    await mountOptionsPage(document, {
+      storageArea: storage,
+      requestApiOriginPermission: async () => true,
+      testApiConnection: async () => undefined
+    });
+
+    const provider = document.querySelector("[name='provider']") as HTMLSelectElement;
+    provider.value = "google-gemini";
+    provider.dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect((document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value).toBe(
+      "https://generativelanguage.googleapis.com/v1beta"
+    );
+    expect((document.querySelector("[name='model']") as HTMLInputElement).value).toBe(
+      "gemini-3.1-flash-lite-preview"
+    );
   });
 });

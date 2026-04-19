@@ -47,6 +47,7 @@ describe("translator client", () => {
 
     const result = await client.translateBlocks({
       config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
         apiBaseUrl: "https://api.example.com/v1/chat/completions",
         apiKey: "secret-key",
         model: "gpt-5-mini",
@@ -92,6 +93,7 @@ describe("translator client", () => {
     await expect(
       client.translateBlocks({
         config: buildPersistedConfigRecord({
+          provider: "openai-compatible",
           apiBaseUrl: "https://api.example.com/v1/chat/completions",
           apiKey: "secret-key",
           model: "gpt-5-mini",
@@ -123,6 +125,7 @@ describe("translator client", () => {
 
     const result = await client.translateBlocks({
       config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
         apiBaseUrl: "https://api.example.com/v1/chat/completions",
         apiKey: "secret-key",
         model: "gpt-5-mini",
@@ -147,6 +150,7 @@ describe("translator client", () => {
     await expect(
       client.translateBlocks({
         config: buildPersistedConfigRecord({
+          provider: "openai-compatible",
           apiBaseUrl: "https://api.example.com/v1/chat/completions",
           apiKey: "secret-key",
           model: "gpt-5-mini",
@@ -192,6 +196,7 @@ describe("translator client", () => {
 
     const result = await client.translateBlocks({
       config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
         apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
         apiKey: "secret-key",
         model: "ep-20260321184346-rlw84",
@@ -237,6 +242,7 @@ describe("translator client", () => {
 
     const result = await client.translateBlocks({
       config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
         apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         apiKey: "secret-key",
         model: "gemini-3.1-flash-lite-preview",
@@ -267,6 +273,7 @@ describe("translator client", () => {
     await expect(
       client.testConnection({
         config: buildPersistedConfigRecord({
+          provider: "openai-compatible",
           apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
           apiKey: "secret-key",
           model: "ep-20260321184346-rlw84",
@@ -290,6 +297,7 @@ describe("translator client", () => {
     await expect(
       client.testConnection({
         config: buildPersistedConfigRecord({
+          provider: "openai-compatible",
           apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
           apiKey: "secret-key",
           model: "ep-20260321184346-rlw84",
@@ -298,5 +306,58 @@ describe("translator client", () => {
         })
       })
     ).rejects.toThrow(/network request to https:\/\/ark\.cn-beijing\.volces\.com\/api\/v3\/responses failed/i);
+  });
+
+  it("supports native Google Gemini generateContent requests", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
+      );
+      expect(init?.headers).toMatchObject({
+        "Content-Type": "application/json",
+        "x-goog-api-key": "secret-key"
+      });
+      const body = JSON.parse(String(init?.body));
+      expect(body.systemInstruction.parts[0].text).toContain("strict JSON object");
+      expect(body.contents[0].parts[0].text).toContain("\"blockId\": \"alpha\"");
+
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      alpha: "第一段"
+                    })
+                  }
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "google-gemini",
+        apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+        apiKey: "secret-key",
+        model: "gemini-3.1-flash-lite-preview",
+        translateTitles: true,
+        translateShortContentBlocks: true
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(result).toEqual({ alpha: "第一段" });
   });
 });

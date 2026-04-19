@@ -38,6 +38,16 @@ type ResponsesApiResponse = {
   }>;
 };
 
+type GeminiGenerateContentResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+};
+
 async function readApiErrorMessage(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as
@@ -147,10 +157,33 @@ function extractResponsesApiText(responseBody: ResponsesApiResponse): string | n
 }
 
 function buildApiTestRequest(config: ExtensionConfig) {
+  if (config.provider === "google-gemini") {
+    const normalized = config.apiBaseUrl.replace(/\/+$/, "");
+    return {
+      mode: "gemini" as const,
+      url: `${normalized}/models/${config.model}:generateContent`,
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": config.apiKey
+      },
+      body: {
+        contents: [
+          {
+            parts: [{ text: 'Reply with "OK" only.' }]
+          }
+        ]
+      }
+    };
+  }
+
   const resolvedApi = resolveApiMode(config.apiBaseUrl);
 
   return {
     ...resolvedApi,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`
+    },
     body:
       resolvedApi.mode === "chat"
         ? {
@@ -178,6 +211,47 @@ function buildApiTestRequest(config: ExtensionConfig) {
             ]
           }
   };
+}
+
+function buildGeminiTranslationBody(blocks: TranslationBlockInput[]) {
+  return {
+    systemInstruction: {
+      parts: [
+        {
+          text:
+            "You are a translation engine. Detect the source language automatically and translate every block to Simplified Chinese. Return a strict JSON object mapping each blockId to its translated string."
+        }
+      ]
+    },
+    contents: [
+      {
+        parts: [
+          {
+            text: JSON.stringify(
+              {
+                task: "Translate the following content blocks into Simplified Chinese.",
+                blocks
+              },
+              null,
+              2
+            )
+          }
+        ]
+      }
+    ]
+  };
+}
+
+function extractGeminiText(responseBody: GeminiGenerateContentResponse): string | null {
+  for (const candidate of responseBody.candidates ?? []) {
+    for (const part of candidate.content?.parts ?? []) {
+      if (typeof part.text === "string" && part.text.trim()) {
+        return part.text;
+      }
+    }
+  }
+
+  return null;
 }
 
 function isAbortError(error: unknown) {
@@ -227,32 +301,52 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
-        const resolvedApi = resolveApiMode(config.apiBaseUrl);
-        const isGeminiChatMode = resolvedApi.mode === "chat" && isGeminiOpenAiCompatibilityUrl(resolvedApi.url);
-        const response = await options.fetchImpl(resolvedApi.url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${config.apiKey}`
-          },
-          body: JSON.stringify(
-            resolvedApi.mode === "chat"
-              ? {
-                  model: config.model,
-                  ...(isGeminiChatMode
-                    ? {}
-                    : {
-                        response_format: {
-                          type: "json_object"
+        const request =
+          config.provider === "google-gemini"
+            ? {
+                mode: "gemini" as const,
+                url: `${config.apiBaseUrl.replace(/\/+$/, "")}/models/${config.model}:generateContent`,
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": config.apiKey
+                },
+                body: buildGeminiTranslationBody(uncachedBlocks)
+              }
+            : (() => {
+                const resolvedApi = resolveApiMode(config.apiBaseUrl);
+                const isGeminiChatMode = resolvedApi.mode === "chat" && isGeminiOpenAiCompatibilityUrl(resolvedApi.url);
+
+                return {
+                  mode: resolvedApi.mode,
+                  url: resolvedApi.url,
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${config.apiKey}`
+                  },
+                  body:
+                    resolvedApi.mode === "chat"
+                      ? {
+                          model: config.model,
+                          ...(isGeminiChatMode
+                            ? {}
+                            : {
+                                response_format: {
+                                  type: "json_object"
+                                }
+                              }),
+                          messages: buildTranslationMessages(uncachedBlocks)
                         }
-                      }),
-                  messages: buildTranslationMessages(uncachedBlocks)
-                }
-              : {
-                  model: config.model,
-                  input: buildResponsesApiInput(uncachedBlocks)
-                }
-          ),
+                      : {
+                          model: config.model,
+                          input: buildResponsesApiInput(uncachedBlocks)
+                        }
+                };
+              })();
+
+        const response = await options.fetchImpl(request.url, {
+          method: "POST",
+          headers: request.headers,
+          body: JSON.stringify(request.body),
           signal: controller.signal
         });
 
@@ -260,11 +354,15 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           throw new Error(await readApiErrorMessage(response));
         }
 
-        const responseBody = (await response.json()) as OpenAiCompatibleResponse & ResponsesApiResponse;
+        const responseBody = (await response.json()) as OpenAiCompatibleResponse &
+          ResponsesApiResponse &
+          GeminiGenerateContentResponse;
         const content =
-          resolvedApi.mode === "chat"
-            ? responseBody.choices?.[0]?.message?.content
-            : extractResponsesApiText(responseBody);
+          request.mode === "gemini"
+            ? extractGeminiText(responseBody)
+            : request.mode === "chat"
+              ? responseBody.choices?.[0]?.message?.content
+              : extractResponsesApiText(responseBody);
 
         if (!content) {
           throw new Error("Translation response did not include a content payload.");
@@ -292,7 +390,11 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
         }
 
         if (error instanceof TypeError) {
-          throw new Error(toNetworkErrorMessage(resolveApiMode(config.apiBaseUrl).url));
+          const failedUrl =
+            config.provider === "google-gemini"
+              ? `${config.apiBaseUrl.replace(/\/+$/, "")}/models/${config.model}:generateContent`
+              : resolveApiMode(config.apiBaseUrl).url;
+          throw new Error(toNetworkErrorMessage(failedUrl));
         }
 
         throw error;
@@ -309,10 +411,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
       try {
         const response = await options.fetchImpl(request.url, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${config.apiKey}`
-          },
+          headers: request.headers,
           body: JSON.stringify(request.body),
           signal: controller.signal
         });

@@ -12,6 +12,7 @@ import { createMemoryStorageArea, loadExtensionConfig, saveExtensionConfig } fro
 describe("config defaults", () => {
   it("returns the expected default settings shape", () => {
     expect(DEFAULT_EXTENSION_CONFIG).toEqual({
+      provider: "openai-compatible",
       apiBaseUrl: "",
       apiOrigin: "",
       apiKey: "",
@@ -27,6 +28,7 @@ describe("config persistence", () => {
   it("saves and loads a config round-trip with normalized origin metadata", async () => {
     const storage = createMemoryStorageArea();
     const persisted = buildPersistedConfigRecord({
+      provider: "openai-compatible",
       apiBaseUrl: "https://api.openai.example.com/v1/chat/completions",
       apiKey: "test-key",
       model: "gpt-4.1-mini",
@@ -38,6 +40,7 @@ describe("config persistence", () => {
     const loaded = await loadExtensionConfig(storage);
 
     expect(loaded).toEqual({
+      provider: "openai-compatible",
       apiBaseUrl: "https://api.openai.example.com/v1/chat/completions",
       apiOrigin: "https://api.openai.example.com",
       apiKey: "test-key",

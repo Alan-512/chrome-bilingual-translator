@@ -14,6 +14,13 @@
         <p class="description">Configure the API endpoint and translation defaults for this extension.</p>
         <form class="form" data-role="options-form">
           <label class="field">
+            <span>Provider</span>
+            <select name="provider">
+              <option value="openai-compatible">OpenAI Compatible</option>
+              <option value="google-gemini">Google Gemini</option>
+            </select>
+          </label>
+          <label class="field">
             <span>API Base URL</span>
             <input name="apiBaseUrl" type="url" autocomplete="off" placeholder="https://api.example.com/v1/chat/completions" />
           </label>

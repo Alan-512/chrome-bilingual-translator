@@ -22,6 +22,7 @@ export type TranslationRequestMessage = {
 export type ApiTestMessage = {
   type: "api/test";
   config: {
+    provider: "openai-compatible" | "google-gemini";
     apiBaseUrl: string;
     apiKey: string;
     model: string;
