@@ -48,6 +48,11 @@ function getStableBlockId(element: HTMLElement): string {
   return nextId;
 }
 
+function isCommentsPage(root: ParentNode): boolean {
+  const doc = root instanceof Document ? root : root.ownerDocument;
+  return /\/comments\//.test(doc.location?.pathname ?? "");
+}
+
 function getNormalizedText(element: HTMLElement | null): string {
   return element?.textContent?.replace(/\s+/g, " ").trim() ?? "";
 }
@@ -94,13 +99,14 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
   const elements = Array.from(root.querySelectorAll<HTMLElement>(CONTENT_SELECTOR));
   const candidates: CandidateBlock[] = [];
   const groupedFeedCardIds = new Set<string>();
+  const allowGroupedRedditFeedCards = !isCommentsPage(root);
 
   elements.forEach((element) => {
     if (isExtensionOwned(element) || isHidden(element) || isInsideDisallowedAncestor(element) || isRedundantSlotContainer(element)) {
       return;
     }
 
-    const groupedFeedCard = getGroupedRedditFeedCandidate(element);
+    const groupedFeedCard = allowGroupedRedditFeedCards ? getGroupedRedditFeedCandidate(element) : null;
     if (groupedFeedCard) {
       if (groupedFeedCardIds.has(groupedFeedCard.blockId)) {
         return;

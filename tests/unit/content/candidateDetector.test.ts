@@ -106,4 +106,36 @@ describe("collectCandidateBlocks", () => {
       "A Reddit feed title that should be translated\n\nFirst body paragraph.\n\nSecond body paragraph."
     );
   });
+
+  it("keeps Reddit comments pages segmented instead of grouping the whole post card", () => {
+    window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a slot="title">I found out why ChatGPT gets slower the longer you use it</a>
+          <div slot="text-body">
+            <p>Been frustrated with chatgpt freezing in long chats for months.</p>
+            <p>Chatgpt renders every single message in your browser at once.</p>
+          </div>
+        </shreddit-post>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => ({ slot: block.element.getAttribute("slot"), text: block.sourceText }))).toEqual([
+      {
+        slot: "title",
+        text: "I found out why ChatGPT gets slower the longer you use it"
+      },
+      {
+        slot: null,
+        text: "Been frustrated with chatgpt freezing in long chats for months."
+      },
+      {
+        slot: null,
+        text: "Chatgpt renders every single message in your browser at once."
+      }
+    ]);
+  });
 });
