@@ -106,8 +106,7 @@ describe("pageController", () => {
     const paragraph = document.querySelector("p") as HTMLElement;
     visibleCallback?.([paragraph]);
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await settlePromises();
 
     expect(requestTranslations).toHaveBeenCalledTimes(2);
     expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(2);
@@ -143,8 +142,7 @@ describe("pageController", () => {
     expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(1);
 
     visibleCallback?.([paragraph]);
-    await Promise.resolve();
-    await Promise.resolve();
+    await settlePromises();
 
     expect(requestTranslations).toHaveBeenCalledTimes(2);
     expect(requestTranslations.mock.calls[1]?.[0]).toHaveLength(1);
@@ -217,8 +215,7 @@ describe("pageController", () => {
     expect(requestTranslations).toHaveBeenCalledTimes(1);
 
     visibleCallback?.([newParagraph]);
-    await Promise.resolve();
-    await Promise.resolve();
+    await settlePromises();
 
     expect(requestTranslations).toHaveBeenCalledTimes(2);
     expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(3);
@@ -262,6 +259,70 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("starts translating newly visible blocks even while an earlier request is still pending", async () => {
+    let visibleCallback: ((elements: HTMLElement[]) => void) | undefined;
+    const heading = document.querySelector("h2") as HTMLElement;
+    const paragraph = document.querySelector("p") as HTMLElement;
+    let resolveFirstBatch: ((value: Record<string, string>) => void) | undefined;
+    let resolveSecondBatch: ((value: Record<string, string>) => void) | undefined;
+    let requestCount = 0;
+
+    const requestTranslations = vi.fn((blocks: Array<{ blockId: string; sourceText: string }>) => {
+      requestCount += 1;
+
+      if (requestCount === 1) {
+        return new Promise<Record<string, string>>((resolve) => {
+          resolveFirstBatch = resolve;
+        });
+      }
+
+      return new Promise<Record<string, string>>((resolve) => {
+        resolveSecondBatch = resolve;
+      });
+    });
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      isElementReadyForTranslation: (element) => element === heading,
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          visibleCallback = callbacks.onVisible;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    const activationPromise = controller.activate();
+    await settlePromises();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(1);
+
+    visibleCallback?.([paragraph]);
+    await settlePromises();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(2);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(2);
+
+    const firstBatchBlocks = requestTranslations.mock.calls[0]?.[0] as Array<{ blockId: string; sourceText: string }>;
+    resolveFirstBatch?.(
+      Object.fromEntries(firstBatchBlocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+    const secondBatchBlocks = requestTranslations.mock.calls[1]?.[0] as Array<{ blockId: string; sourceText: string }>;
+    resolveSecondBatch?.(
+      Object.fromEntries(secondBatchBlocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    await activationPromise;
+
+    const translatedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(translatedBlocks).toHaveLength(2);
+    expect(translatedBlocks.every((node) => node.textContent?.includes("ZH:"))).toBe(true);
+    await controller.deactivate();
+  });
+
   it("renders completed batches before later batches finish with twelve blocks per batch", async () => {
     document.body.innerHTML = `
       <main>
@@ -297,7 +358,7 @@ describe("pageController", () => {
     await settlePromises();
 
     let renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
-    expect(renderedBlocks).toHaveLength(12);
+    expect(renderedBlocks).toHaveLength(13);
     expect(renderedBlocks.every((node) => node.getAttribute("data-bilingual-translator-state") === "loading")).toBe(
       true
     );

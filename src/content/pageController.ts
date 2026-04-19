@@ -27,6 +27,13 @@ type PageControllerDependencies = {
 };
 
 const TRANSLATION_BATCH_SIZE = 12;
+const MAX_CONCURRENT_BATCHES = 2;
+
+type CandidateBlock = ReturnType<typeof collectCandidateBlocks>[number];
+type QueuedBatch = {
+  candidates: CandidateBlock[];
+  resolve: () => void;
+};
 
 async function safeReportPageState(
   dependencies: PageControllerDependencies,
@@ -116,9 +123,39 @@ export function createPageController(doc: Document, dependencies: PageController
   const isElementReadyForTranslation = dependencies.isElementReadyForTranslation ?? isElementNearViewport;
   let active = false;
   let translatedBlockCount = 0;
-  let isProcessing = false;
-  let rescanQueued = false;
-  let queuedElements: HTMLElement[] | null = null;
+  let pendingBlockCount = 0;
+  let inFlightBatchCount = 0;
+  let lastError: Error | null = null;
+  const failedBlockIds = new Set<string>();
+  const queuedBatches: QueuedBatch[] = [];
+
+  async function syncPageState() {
+    updateStatusPill(
+      statusPill,
+      failedBlockIds.size > 0
+        ? {
+            state: "error",
+            translatedBlockCount,
+            failedBlockCount: failedBlockIds.size,
+            errorMessage: lastError?.message
+          }
+        : pendingBlockCount > 0
+          ? {
+              state: "translating",
+              translatedBlockCount
+            }
+          : {
+              state: active ? "translated" : "idle",
+              translatedBlockCount
+            }
+    );
+
+    await safeReportPageState(dependencies, {
+      enabled: active,
+      translatedBlockCount,
+      pendingRequestCount: pendingBlockCount
+    });
+  }
 
   function getEligibleCandidates(targetElements?: HTMLElement[]) {
     const targetSet = targetElements ? new Set(targetElements) : null;
@@ -140,123 +177,90 @@ export function createPageController(doc: Document, dependencies: PageController
     });
   }
 
-  async function processCandidates(targetElements?: HTMLElement[]) {
-    if (isProcessing) {
-      rescanQueued = true;
-      if (targetElements) {
-        queuedElements = [...(queuedElements ?? []), ...targetElements];
+  async function processBatch(batch: CandidateBlock[]) {
+    const batchResult = await requestBatchRobust(
+      dependencies,
+      batch.map((candidate) => ({
+        blockId: candidate.blockId,
+        sourceText: candidate.sourceText
+      }))
+    );
+    lastError = batchResult.lastError ?? lastError;
+
+    for (const candidate of batch) {
+      const translationText = batchResult.translations[candidate.blockId];
+      pendingBlockCount = Math.max(0, pendingBlockCount - 1);
+
+      if (!translationText) {
+        stateStore.set(candidate.blockId, "failed");
+        removeRenderedTranslationBlock(doc, candidate.blockId);
+        failedBlockIds.add(candidate.blockId);
+        continue;
       }
-      return;
+
+      renderTranslationBelow(candidate.element, {
+        blockId: candidate.blockId,
+        translationText
+      });
+      failedBlockIds.delete(candidate.blockId);
+      stateStore.set(candidate.blockId, "translated");
+      translatedBlockCount += 1;
     }
 
-    isProcessing = true;
-    const candidates = getEligibleCandidates(targetElements);
+    await syncPageState();
+  }
 
-    try {
-      if (candidates.length === 0) {
-        updateStatusPill(statusPill, { state: "translated", translatedBlockCount });
-        await safeReportPageState(dependencies, {
-          enabled: active,
-          translatedBlockCount,
-          pendingRequestCount: 0
-        });
+  function drainQueuedBatches() {
+    while (active && inFlightBatchCount < MAX_CONCURRENT_BATCHES && queuedBatches.length > 0) {
+      const nextBatch = queuedBatches.shift();
+      if (!nextBatch) {
         return;
       }
 
-      observerCoordinator.observeCandidates(candidates.map((candidate) => candidate.element));
-      const totalFailedBlockIds = new Set<string>();
-      let lastError: Error | null = null;
-
-      for (const candidateBatch of chunkBlocks(candidates, TRANSLATION_BATCH_SIZE)) {
-        candidateBatch.forEach((candidate) => {
-          stateStore.set(candidate.blockId, "pending");
-          renderTranslationLoadingBelow(candidate.element, {
-            blockId: candidate.blockId
-          });
+      inFlightBatchCount += 1;
+      void processBatch(nextBatch.candidates)
+        .finally(() => {
+          inFlightBatchCount = Math.max(0, inFlightBatchCount - 1);
+          nextBatch.resolve();
+          drainQueuedBatches();
         });
-        updateStatusPill(statusPill, { state: "translating", translatedBlockCount });
-        await safeReportPageState(dependencies, {
-          enabled: active,
-          translatedBlockCount,
-          pendingRequestCount: candidateBatch.length
-        });
-
-        const batchResult = await requestBatchRobust(
-          dependencies,
-          candidateBatch.map((candidate) => ({
-            blockId: candidate.blockId,
-            sourceText: candidate.sourceText
-          }))
-        );
-        lastError = batchResult.lastError ?? lastError;
-
-        for (const candidate of candidateBatch) {
-          const translationText = batchResult.translations[candidate.blockId];
-          if (!translationText) {
-            stateStore.set(candidate.blockId, "failed");
-            removeRenderedTranslationBlock(doc, candidate.blockId);
-            totalFailedBlockIds.add(candidate.blockId);
-            continue;
-          }
-
-          renderTranslationBelow(candidate.element, {
-            blockId: candidate.blockId,
-            translationText
-          });
-          stateStore.set(candidate.blockId, "translated");
-          translatedBlockCount += 1;
-        }
-
-        updateStatusPill(
-          statusPill,
-          totalFailedBlockIds.size > 0
-            ? {
-                state: "error",
-                translatedBlockCount,
-                failedBlockCount: totalFailedBlockIds.size,
-                errorMessage: lastError?.message
-              }
-            : {
-                state: "translating",
-                translatedBlockCount
-              }
-        );
-        await safeReportPageState(dependencies, {
-          enabled: active,
-          translatedBlockCount,
-          pendingRequestCount: 0
-        });
-      }
-
-      updateStatusPill(
-        statusPill,
-        totalFailedBlockIds.size > 0
-          ? {
-              state: "error",
-              translatedBlockCount,
-              failedBlockCount: totalFailedBlockIds.size,
-              errorMessage: lastError?.message
-            }
-          : {
-              state: "translated",
-              translatedBlockCount
-            }
-      );
-      await safeReportPageState(dependencies, {
-        enabled: active,
-        translatedBlockCount,
-        pendingRequestCount: 0
-      });
-    } finally {
-      isProcessing = false;
-
-      if (rescanQueued && active) {
-        rescanQueued = false;
-        const nextQueuedElements = queuedElements;
-        queuedElements = null;
-        await processCandidates(nextQueuedElements ?? undefined);
-      }
     }
+  }
+
+  async function processCandidates(targetElements?: HTMLElement[]) {
+    const candidates = getEligibleCandidates(targetElements);
+
+    if (candidates.length === 0) {
+      await syncPageState();
+      return;
+    }
+
+    observerCoordinator.observeCandidates(candidates.map((candidate) => candidate.element));
+    const batchPromises = chunkBlocks(candidates, TRANSLATION_BATCH_SIZE).map((candidateBatch) => {
+      candidateBatch.forEach((candidate) => {
+        stateStore.set(candidate.blockId, "pending");
+        renderTranslationLoadingBelow(candidate.element, {
+          blockId: candidate.blockId
+        });
+      });
+      pendingBlockCount += candidateBatch.length;
+
+      let resolveBatch = () => {};
+      const batchPromise = new Promise<void>((resolve) => {
+        resolveBatch = resolve;
+      });
+      queuedBatches.push({
+        candidates: candidateBatch,
+        resolve: resolveBatch
+      });
+
+      return batchPromise;
+    });
+
+    await syncPageState();
+    drainQueuedBatches();
+
+    await Promise.all(batchPromises);
   }
 
   return {
@@ -311,8 +315,11 @@ export function createPageController(doc: Document, dependencies: PageController
     async deactivate() {
       active = false;
       translatedBlockCount = 0;
-      rescanQueued = false;
-      queuedElements = null;
+      pendingBlockCount = 0;
+      inFlightBatchCount = 0;
+      lastError = null;
+      failedBlockIds.clear();
+      queuedBatches.length = 0;
       observerCoordinator.disconnect();
       removeRenderedTranslations(doc);
       stateStore.clear();
