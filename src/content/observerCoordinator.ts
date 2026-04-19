@@ -12,6 +12,21 @@ export function createObserverCoordinator(
   doc: Document,
   dependencies: ObserverCoordinatorDependencies = {}
 ) {
+  let mutationFlushScheduled = false;
+
+  function scheduleMutationFlush() {
+    if (mutationFlushScheduled) {
+      return;
+    }
+
+    mutationFlushScheduled = true;
+    const schedule = doc.defaultView?.setTimeout?.bind(doc.defaultView) ?? setTimeout;
+    schedule(() => {
+      mutationFlushScheduled = false;
+      callbacks?.onMutation();
+    }, 0);
+  }
+
   function isExtensionOwnedNode(node: Node | null): boolean {
     if (node instanceof Text) {
       return isExtensionOwnedNode(node.parentElement);
@@ -76,7 +91,7 @@ export function createObserverCoordinator(
 
   const mutationObserver = createMutationObserver((records) => {
     if (hasMeaningfulMutation(records)) {
-      callbacks?.onMutation();
+      scheduleMutationFlush();
     }
   });
 

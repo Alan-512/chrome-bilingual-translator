@@ -49,6 +49,7 @@ describe("observerCoordinator", () => {
   });
 
   it("forwards mutation events and disconnects both observers", () => {
+    vi.useFakeTimers();
     let mutationCallback: MutationCallback | undefined;
     const intersectionDisconnect = vi.fn();
     const mutationDisconnect = vi.fn();
@@ -87,10 +88,56 @@ describe("observerCoordinator", () => {
       ] as MutationRecord[],
       {} as MutationObserver
     );
+    vi.runAllTimers();
     coordinator.disconnect();
 
     expect(onMutation).toHaveBeenCalledTimes(1);
     expect(intersectionDisconnect).toHaveBeenCalledTimes(1);
     expect(mutationDisconnect).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("batches rapid mutation events into a single callback tick", async () => {
+    vi.useFakeTimers();
+    let mutationCallback: MutationCallback | undefined;
+
+    const coordinator = createObserverCoordinator(document, {
+      createIntersectionObserver() {
+        return {
+          observe: vi.fn(),
+          disconnect: vi.fn()
+        } as unknown as IntersectionObserver;
+      },
+      createMutationObserver(callback) {
+        mutationCallback = callback;
+        return {
+          observe: vi.fn(),
+          disconnect: vi.fn()
+        } as unknown as MutationObserver;
+      }
+    });
+
+    const onMutation = vi.fn();
+    coordinator.start([], {
+      onVisible: vi.fn(),
+      onMutation
+    });
+
+    const record = {
+      type: "childList",
+      target: document.createElement("main"),
+      addedNodes: [document.createElement("p")] as unknown as NodeList,
+      removedNodes: [] as unknown as NodeList
+    } as MutationRecord;
+
+    mutationCallback?.([record], {} as MutationObserver);
+    mutationCallback?.([record], {} as MutationObserver);
+    mutationCallback?.([record], {} as MutationObserver);
+
+    expect(onMutation).toHaveBeenCalledTimes(0);
+    await vi.runAllTimersAsync();
+
+    expect(onMutation).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });
