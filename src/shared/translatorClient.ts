@@ -9,6 +9,9 @@ export type TranslatorClient = {
     config: ExtensionConfig;
     blocks: TranslationBlockInput[];
   }): Promise<Record<string, string>>;
+  testConnection(input: {
+    config: ExtensionConfig;
+  }): Promise<void>;
 };
 
 type CreateTranslatorClientOptions = {
@@ -34,6 +37,29 @@ type ResponsesApiResponse = {
     }>;
   }>;
 };
+
+async function readApiErrorMessage(response: Response): Promise<string> {
+  try {
+    const payload = (await response.json()) as { error?: { message?: string } };
+    const message = payload.error?.message?.trim();
+    if (message) {
+      return message;
+    }
+  } catch {
+    // ignore non-json error bodies
+  }
+
+  try {
+    const text = (await response.text()).trim();
+    if (text) {
+      return text;
+    }
+  } catch {
+    // ignore unreadable bodies
+  }
+
+  return `Translation request failed with ${response.status} ${response.statusText}`.trim();
+}
 
 function parseTranslationPayload(content: string, expectedBlockIds: string[]): Record<string, string> {
   const parsed = JSON.parse(content) as Record<string, unknown>;
@@ -106,6 +132,40 @@ function extractResponsesApiText(responseBody: ResponsesApiResponse): string | n
   return null;
 }
 
+function buildApiTestRequest(config: ExtensionConfig) {
+  const resolvedApi = resolveApiMode(config.apiBaseUrl);
+
+  return {
+    ...resolvedApi,
+    body:
+      resolvedApi.mode === "chat"
+        ? {
+            model: config.model,
+            max_tokens: 8,
+            messages: [
+              {
+                role: "user",
+                content: 'Reply with "OK" only.'
+              }
+            ]
+          }
+        : {
+            model: config.model,
+            input: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "input_text",
+                    text: 'Reply with "OK" only.'
+                  }
+                ]
+              }
+            ]
+          }
+  };
+}
+
 export function createTranslatorClient(options: CreateTranslatorClientOptions): TranslatorClient {
   const timeoutMs = options.timeoutMs ?? 15_000;
 
@@ -157,7 +217,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
         });
 
         if (!response.ok) {
-          throw new Error(`Translation request failed with ${response.status} ${response.statusText}`);
+          throw new Error(await readApiErrorMessage(response));
         }
 
         const responseBody = (await response.json()) as OpenAiCompatibleResponse & ResponsesApiResponse;
@@ -186,6 +246,30 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           ...result,
           ...translatedBlocks
         };
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
+
+    async testConnection({ config }) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const request = buildApiTestRequest(config);
+        const response = await options.fetchImpl(request.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.apiKey}`
+          },
+          body: JSON.stringify(request.body),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(await readApiErrorMessage(response));
+        }
       } finally {
         clearTimeout(timeout);
       }

@@ -6,10 +6,50 @@ import { SessionStorageTabSessionStore } from "../../../src/background/tabSessio
 import { createBackgroundMessageRouter } from "../../../src/background/messageRouter";
 
 describe("background message router", () => {
+  it("tests api connectivity with unsaved configuration", async () => {
+    const testConnection = vi.fn(async () => undefined);
+    const requestApiPermission = vi.fn(async () => true);
+    const router = createBackgroundMessageRouter({
+      loadConfig: async () =>
+        buildPersistedConfigRecord({
+          apiBaseUrl: "",
+          apiKey: "",
+          model: "",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        }),
+      translator: {
+        translateBlocks: vi.fn(),
+        testConnection
+      },
+      requestApiPermission,
+      tabSessionStore: new SessionStorageTabSessionStore(createMemoryStorageArea())
+    });
+
+    const result = await router.handleMessage(
+      {
+        type: "api/test",
+        config: {
+          apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+          apiKey: "secret-key",
+          model: "ep-20260321184346-rlw84",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        }
+      },
+      {}
+    );
+
+    expect(result).toEqual({ ok: true });
+    expect(requestApiPermission).toHaveBeenCalledWith("https://ark.cn-beijing.volces.com");
+    expect(testConnection).toHaveBeenCalledTimes(1);
+  });
+
   it("routes translation requests and updates tab session counts", async () => {
     const translateBlocks = vi.fn(async () => ({
       alpha: "第一段"
     }));
+    const testConnection = vi.fn(async () => undefined);
     const requestApiPermission = vi.fn(async () => true);
     const store = new SessionStorageTabSessionStore(createMemoryStorageArea());
 
@@ -22,7 +62,7 @@ describe("background message router", () => {
           translateTitles: true,
           translateShortContentBlocks: true
         }),
-      translator: { translateBlocks },
+      translator: { translateBlocks, testConnection },
       requestApiPermission,
       tabSessionStore: store
     });
@@ -61,7 +101,8 @@ describe("background message router", () => {
           translateShortContentBlocks: true
         }),
       translator: {
-        translateBlocks: vi.fn()
+        translateBlocks: vi.fn(),
+        testConnection: vi.fn(async () => undefined)
       },
       requestApiPermission: vi.fn(async () => true),
       tabSessionStore: new SessionStorageTabSessionStore(createMemoryStorageArea())
@@ -92,7 +133,8 @@ describe("background message router", () => {
           translateShortContentBlocks: true
         }),
       translator: {
-        translateBlocks
+        translateBlocks,
+        testConnection: vi.fn(async () => undefined)
       },
       requestApiPermission,
       tabSessionStore: new SessionStorageTabSessionStore(createMemoryStorageArea())

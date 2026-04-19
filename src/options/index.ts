@@ -9,7 +9,7 @@ import { createChromeStorageArea, loadExtensionConfig, saveExtensionConfig, type
 type OptionsPageDependencies = {
   storageArea: StorageAreaLike;
   requestApiOriginPermission: (origin: string) => Promise<boolean>;
-  fetchImpl?: typeof fetch;
+  testApiConnection: (config: PersistedExtensionConfigInput) => Promise<void>;
 };
 
 type OptionsFormControls = {
@@ -98,58 +98,6 @@ function updateApiOriginPreview(controls: OptionsFormControls) {
   controls.apiOriginPreview.textContent = origin ? `Requests will be sent to ${origin}` : "Enter a valid API URL.";
 }
 
-function resolveApiTestTarget(apiBaseUrl: string) {
-  const normalized = apiBaseUrl.replace(/\/+$/, "");
-  if (normalized.endsWith("/chat/completions")) {
-    return {
-      url: normalized,
-      body: {
-        model: undefined as string | undefined,
-        max_tokens: 8,
-        messages: [
-          {
-            role: "user",
-            content: 'Reply with "OK" only.'
-          }
-        ]
-      }
-    };
-  }
-
-  const url = normalized.endsWith("/responses") ? normalized : `${normalized}/responses`;
-  return {
-    url,
-    body: {
-      model: undefined as string | undefined,
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: 'Reply with "OK" only.'
-            }
-          ]
-        }
-      ]
-    }
-  };
-}
-
-async function readApiErrorMessage(response: Response): Promise<string> {
-  try {
-    const payload = (await response.json()) as { error?: { message?: string } };
-    const message = payload.error?.message?.trim();
-    if (message) {
-      return message;
-    }
-  } catch {
-    // ignore non-json error bodies
-  }
-
-  return `API test failed with ${response.status} ${response.statusText}`.trim();
-}
-
 async function testApiConfiguration(
   controls: OptionsFormControls,
   dependencies: OptionsPageDependencies,
@@ -177,25 +125,7 @@ async function testApiConfiguration(
   controls.testApi.textContent = "Testing...";
 
   try {
-    const testTarget = resolveApiTestTarget(nextConfig.apiBaseUrl);
-    const response = await (dependencies.fetchImpl ?? fetch)(testTarget.url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${nextConfig.apiKey}`
-      },
-      body: JSON.stringify({
-        ...testTarget.body,
-        model: nextConfig.model
-      })
-    });
-
-    if (!response.ok) {
-      const errorMessage = await readApiErrorMessage(response);
-      setStatus(controls.status, errorMessage, "error");
-      showToast(doc, errorMessage, "error");
-      return;
-    }
+    await dependencies.testApiConnection(collectFormInput(controls));
 
     setStatus(controls.status, "API connection succeeded.", "success");
     showToast(doc, "API connection succeeded.", "success");
@@ -266,7 +196,6 @@ async function bootstrap() {
 
   await mountOptionsPage(document, {
     storageArea: createChromeStorageArea(chrome.storage.local),
-    fetchImpl: (...args) => fetch(...args),
     requestApiOriginPermission: async (origin) => {
       if (!chrome.permissions) {
         return true;
@@ -278,6 +207,16 @@ async function bootstrap() {
       }
 
       return chrome.permissions.request({ origins: [`${origin}/*`] });
+    },
+    testApiConnection: async (config) => {
+      const response = (await chrome.runtime.sendMessage({
+        type: "api/test",
+        config
+      })) as { ok?: boolean; error?: string };
+
+      if (!response?.ok) {
+        throw new Error(response?.error ?? "API connection failed.");
+      }
     }
   });
 }

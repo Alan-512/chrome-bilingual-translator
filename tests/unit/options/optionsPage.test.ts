@@ -66,7 +66,8 @@ describe("mountOptionsPage", () => {
 
     await mountOptionsPage(document, {
       storageArea: storage,
-      requestApiOriginPermission: async () => true
+      requestApiOriginPermission: async () => true,
+      testApiConnection: async () => undefined
     });
 
     expect((document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value).toBe(
@@ -83,7 +84,8 @@ describe("mountOptionsPage", () => {
 
     await mountOptionsPage(document, {
       storageArea: storage,
-      requestApiOriginPermission: async () => true
+      requestApiOriginPermission: async () => true,
+      testApiConnection: async () => undefined
     });
 
     (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://api.test.dev/v1/chat/completions";
@@ -108,7 +110,8 @@ describe("mountOptionsPage", () => {
 
     await mountOptionsPage(document, {
       storageArea: storage,
-      requestApiOriginPermission: async () => false
+      requestApiOriginPermission: async () => false,
+      testApiConnection: async () => undefined
     });
 
     (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value =
@@ -128,7 +131,8 @@ describe("mountOptionsPage", () => {
 
     await mountOptionsPage(document, {
       storageArea: storage,
-      requestApiOriginPermission: async () => true
+      requestApiOriginPermission: async () => true,
+      testApiConnection: async () => undefined
     });
 
     (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value =
@@ -150,7 +154,8 @@ describe("mountOptionsPage", () => {
 
     await mountOptionsPage(document, {
       storageArea: storage,
-      requestApiOriginPermission: async () => true
+      requestApiOriginPermission: async () => true,
+      testApiConnection: async () => undefined
     });
 
     const input = document.querySelector("[name='apiBaseUrl']") as HTMLInputElement;
@@ -174,24 +179,20 @@ describe("mountOptionsPage", () => {
         targetLanguage: "zh-CN"
       }
     });
-    const fetchImpl = async (_input: RequestInfo | URL, init?: RequestInit) =>
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content: "OK"
-              }
-            }
-          ]
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      );
+    let observedConfig: {
+      apiBaseUrl: string;
+      apiKey: string;
+      model: string;
+      translateTitles: boolean;
+      translateShortContentBlocks: boolean;
+    } | null = null;
 
     await mountOptionsPage(document, {
       storageArea: storage,
       requestApiOriginPermission: async () => true,
-      fetchImpl
+      testApiConnection: async (config) => {
+        observedConfig = config;
+      }
     });
 
     (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://api.test.dev/v1/chat/completions";
@@ -203,26 +204,26 @@ describe("mountOptionsPage", () => {
 
     const savedConfig = await loadExtensionConfig(storage);
     expect(savedConfig.apiBaseUrl).toBe("https://saved.example.com/v1/chat/completions");
+    expect(observedConfig).toEqual({
+      apiBaseUrl: "https://api.test.dev/v1/chat/completions",
+      apiKey: "test-key",
+      model: "test-model",
+      translateTitles: true,
+      translateShortContentBlocks: true
+    });
     expect(document.querySelector("[data-role='toast']")?.textContent).toContain("API connection succeeded");
     expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("success");
   });
 
   it("shows the returned API error when test api fails", async () => {
     const storage = createMemoryStorageArea();
-    const fetchImpl = async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      ({
-        ok: false,
-        status: 400,
-        statusText: "Bad Request",
-        async json() {
-          return { error: { message: "Bad model" } };
-        }
-      } as Response);
 
     await mountOptionsPage(document, {
       storageArea: storage,
       requestApiOriginPermission: async () => true,
-      fetchImpl
+      testApiConnection: async () => {
+        throw new Error("Bad model");
+      }
     });
 
     (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://api.test.dev/v1/chat/completions";
@@ -236,24 +237,22 @@ describe("mountOptionsPage", () => {
     expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("error");
   });
 
-  it("tests root base URLs through the responses endpoint", async () => {
+  it("tests root base URLs through the background api test flow", async () => {
     const storage = createMemoryStorageArea();
-    const fetchImpl = async (input: RequestInfo | URL, _init?: RequestInit) => {
-      expect(String(input)).toBe("https://ark.cn-beijing.volces.com/api/v3/responses");
-      return {
-        ok: true,
-        status: 200,
-        statusText: "OK",
-        async json() {
-          return { output: [] };
-        }
-      } as Response;
-    };
+    let observedConfig: {
+      apiBaseUrl: string;
+      apiKey: string;
+      model: string;
+      translateTitles: boolean;
+      translateShortContentBlocks: boolean;
+    } | null = null;
 
     await mountOptionsPage(document, {
       storageArea: storage,
       requestApiOriginPermission: async () => true,
-      fetchImpl
+      testApiConnection: async (config) => {
+        observedConfig = config;
+      }
     });
 
     (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://ark.cn-beijing.volces.com/api/v3";
@@ -263,6 +262,7 @@ describe("mountOptionsPage", () => {
     document.querySelector("[data-role='test-api']")?.dispatchEvent(new Event("click", { bubbles: true }));
     await flushAsyncWork();
 
+    expect(observedConfig?.apiBaseUrl).toBe("https://ark.cn-beijing.volces.com/api/v3");
     expect(document.querySelector("[data-role='toast']")?.textContent).toContain("API connection succeeded");
   });
 });

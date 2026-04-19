@@ -19,6 +19,17 @@ export type TranslationRequestMessage = {
   blocks: TranslationRequestBlock[];
 };
 
+export type ApiTestMessage = {
+  type: "api/test";
+  config: {
+    apiBaseUrl: string;
+    apiKey: string;
+    model: string;
+    translateTitles: boolean;
+    translateShortContentBlocks: boolean;
+  };
+};
+
 export type PageStatusReportMessage = {
   type: "page/status";
   tabId: number;
@@ -30,5 +41,6 @@ export type PageStatusReportMessage = {
 export type RuntimeMessage =
   | ActivatePageTranslationMessage
   | DeactivatePageTranslationMessage
+  | ApiTestMessage
   | TranslationRequestMessage
   | PageStatusReportMessage;
