@@ -4,9 +4,10 @@ type CandidateBlock = {
   sourceText: string;
 };
 
-const CONTENT_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
+const CONTENT_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [slot='title'], [slot='text-body']";
 const DISALLOWED_ANCESTORS = ["nav", "header", "footer", "aside", "button"];
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
+const REDUNDANT_CONTAINER_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
 let nextSourceId = 0;
 
 function isExtensionOwned(element: Element): boolean {
@@ -19,6 +20,14 @@ function isHidden(element: HTMLElement): boolean {
 
 function isInsideDisallowedAncestor(element: Element): boolean {
   return DISALLOWED_ANCESTORS.some((selector) => element.closest(selector) !== null);
+}
+
+function isRedundantSlotContainer(element: HTMLElement): boolean {
+  if (element.getAttribute("slot") !== "text-body") {
+    return false;
+  }
+
+  return element.querySelector(REDUNDANT_CONTAINER_SELECTOR) !== null;
 }
 
 function looksLikeMostlyNumericText(text: string): boolean {
@@ -48,7 +57,7 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
       return;
     }
 
-    if (isExtensionOwned(element) || isHidden(element) || isInsideDisallowedAncestor(element)) {
+    if (isExtensionOwned(element) || isHidden(element) || isInsideDisallowedAncestor(element) || isRedundantSlotContainer(element)) {
       return;
     }
 
