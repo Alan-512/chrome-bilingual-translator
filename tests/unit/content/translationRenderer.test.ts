@@ -106,6 +106,30 @@ describe("renderTranslationBelow", () => {
     expect(translation.textContent).toBe("一条应该被翻译的 Reddit 首页标题");
   });
 
+  it("anchors inline slot titles below their containing heading instead of injecting into the title row", () => {
+    document.body.innerHTML = `
+      <main>
+        <article>
+          <h2 id="heading">
+            <a id="source" slot="title">Claude Code Game Studios</a>
+            <span id="badge">Public template</span>
+          </h2>
+        </article>
+      </main>
+    `;
+    const source = document.getElementById("source") as HTMLElement;
+    const heading = document.getElementById("heading") as HTMLHeadingElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "Claude Code 游戏工作室"
+    });
+
+    expect(heading.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
+    expect(heading.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
+    expect((heading.nextElementSibling as HTMLElement).textContent).toBe("Claude Code 游戏工作室");
+  });
+
   it("relaxes clipped card containers so the translated text can fully expand", () => {
     document.body.innerHTML = `
       <main>

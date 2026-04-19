@@ -17,6 +17,7 @@ const STYLE_ATTRIBUTE = "data-bilingual-translator-style";
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
 const FALLBACK_SOURCE_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [slot='title'], [slot='text-body']";
 const EXPANDED_ATTRIBUTE = "data-bilingual-translator-expanded";
+const SEMANTIC_BLOCK_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
 
 function ensureTranslationStyles(doc: Document): void {
   if (doc.head?.querySelector(`[${STYLE_ATTRIBUTE}='true']`)) {
@@ -69,9 +70,26 @@ function ensureTranslationStyles(doc: Document): void {
   doc.head?.appendChild(style);
 }
 
+function getComputedDisplay(element: HTMLElement): string {
+  return element.ownerDocument.defaultView?.getComputedStyle(element).display ?? "";
+}
+
+function getTranslationAnchorElement(sourceElement: HTMLElement): HTMLElement {
+  const sourceDisplay = getComputedDisplay(sourceElement);
+  const isInlineLikeSource =
+    sourceElement.matches("[slot='title']") || sourceDisplay.startsWith("inline") || sourceDisplay === "contents";
+
+  if (!isInlineLikeSource) {
+    return sourceElement;
+  }
+
+  return sourceElement.closest<HTMLElement>(SEMANTIC_BLOCK_SELECTOR) ?? sourceElement;
+}
+
 function getOrCreateTranslationElement(sourceElement: HTMLElement, blockId: string): HTMLElement {
   ensureTranslationStyles(sourceElement.ownerDocument);
-  const existing = sourceElement.parentElement?.querySelector<HTMLElement>(
+  const anchorElement = getTranslationAnchorElement(sourceElement);
+  const existing = anchorElement.parentElement?.querySelector<HTMLElement>(
     `[${OWNED_ATTRIBUTE}='true'][${BLOCK_ID_ATTRIBUTE}='${blockId}']`
   );
   if (existing) {
@@ -82,7 +100,7 @@ function getOrCreateTranslationElement(sourceElement: HTMLElement, blockId: stri
   translationElement.setAttribute(OWNED_ATTRIBUTE, "true");
   translationElement.setAttribute(BLOCK_ID_ATTRIBUTE, blockId);
   translationElement.className = "bilingual-translator-translation";
-  sourceElement.insertAdjacentElement("afterend", translationElement);
+  anchorElement.insertAdjacentElement("afterend", translationElement);
   return translationElement;
 }
 
