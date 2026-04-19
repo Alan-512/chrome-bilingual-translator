@@ -31,6 +31,11 @@ function ensureTranslationStyles(doc: Document): void {
 
     .bilingual-translator-translation[data-bilingual-translator-state="translated"] {
       color: inherit;
+      display: inline-block;
+      width: fit-content;
+      max-width: 100%;
+      border-bottom: 2px dashed color-mix(in srgb, currentColor 64%, transparent);
+      padding-bottom: 2px;
     }
 
     .bilingual-translator-translation[data-bilingual-translator-state="loading"] {
