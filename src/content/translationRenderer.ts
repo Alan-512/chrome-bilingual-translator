@@ -16,6 +16,7 @@ const STATE_ATTRIBUTE = "data-bilingual-translator-state";
 const STYLE_ATTRIBUTE = "data-bilingual-translator-style";
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
 const FALLBACK_SOURCE_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [slot='title'], [slot='text-body']";
+const EXPANDED_ATTRIBUTE = "data-bilingual-translator-expanded";
 
 function ensureTranslationStyles(doc: Document): void {
   if (doc.head?.querySelector(`[${STYLE_ATTRIBUTE}='true']`)) {
@@ -85,6 +86,22 @@ function getOrCreateTranslationElement(sourceElement: HTMLElement, blockId: stri
   return translationElement;
 }
 
+function relaxClippedAncestors(sourceElement: HTMLElement): void {
+  let current: HTMLElement | null = sourceElement.parentElement;
+
+  while (current) {
+    const hasInlineClipping = current.style.overflow === "hidden" || current.style.maxHeight !== "";
+    if (hasInlineClipping) {
+      current.setAttribute(EXPANDED_ATTRIBUTE, "true");
+      current.style.overflow = "visible";
+      current.style.maxHeight = "none";
+      return;
+    }
+
+    current = current.parentElement;
+  }
+}
+
 function normalizeText(text: string | null | undefined): string {
   return text?.replace(/\s+/g, " ").trim() ?? "";
 }
@@ -134,6 +151,7 @@ export function renderTranslationLoadingBelow(
   sourceElement: HTMLElement,
   input: RenderTranslationLoadingInput
 ): HTMLElement {
+  relaxClippedAncestors(sourceElement);
   const translationElement = getOrCreateTranslationElement(sourceElement, input.blockId);
   translationElement.setAttribute(STATE_ATTRIBUTE, "loading");
   translationElement.replaceChildren();
@@ -158,6 +176,7 @@ export function renderTranslationLoadingBelow(
 
 export function renderTranslationBelow(sourceElement: HTMLElement, input: RenderTranslationInput): HTMLElement {
   const liveSourceElement = resolveLiveSourceElement(sourceElement, input.blockId, input.sourceText);
+  relaxClippedAncestors(liveSourceElement);
   const translationElement = getOrCreateTranslationElement(liveSourceElement, input.blockId);
   translationElement.setAttribute(STATE_ATTRIBUTE, "translated");
   translationElement.textContent = input.translationText;

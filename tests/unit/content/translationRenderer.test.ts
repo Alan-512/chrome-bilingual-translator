@@ -105,4 +105,25 @@ describe("renderTranslationBelow", () => {
     expect(translation.dataset.bilingualTranslatorOwned).toBe("true");
     expect(translation.textContent).toBe("一条应该被翻译的 Reddit 首页标题");
   });
+
+  it("relaxes clipped card containers so the translated text can fully expand", () => {
+    document.body.innerHTML = `
+      <main>
+        <article id="card" style="overflow: hidden; max-height: 80px;">
+          <p id="source">A long Reddit card excerpt that should expand once translated.</p>
+        </article>
+      </main>
+    `;
+    const source = document.getElementById("source") as HTMLParagraphElement;
+    const card = document.getElementById("card") as HTMLElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "一段较长的 Reddit 卡片译文，应该在插入后完整展示，而不是被父容器裁掉。"
+    });
+
+    expect(card.getAttribute("data-bilingual-translator-expanded")).toBe("true");
+    expect(card.style.overflow).toBe("visible");
+    expect(card.style.maxHeight).toBe("none");
+  });
 });
