@@ -24,28 +24,28 @@ function ensureTranslationStyles(doc: Document): void {
   style.textContent = `
     .bilingual-translator-translation {
       margin-top: 8px;
-      color: #d6e2ff;
+      color: inherit;
       font-size: 0.9em;
       line-height: 1.45;
     }
 
     .bilingual-translator-translation[data-bilingual-translator-state="translated"] {
-      color: #d6e2ff;
+      color: inherit;
     }
 
     .bilingual-translator-translation[data-bilingual-translator-state="loading"] {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      color: #8fb0ff;
-      opacity: 0.96;
+      color: inherit;
+      opacity: 0.82;
     }
 
     .bilingual-translator-spinner {
       width: 12px;
       height: 12px;
-      border: 2px solid rgba(107, 146, 255, 0.28);
-      border-top-color: #72a0ff;
+      border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+      border-top-color: currentColor;
       border-radius: 999px;
       animation: bilingual-translator-spin 0.85s linear infinite;
       flex: none;

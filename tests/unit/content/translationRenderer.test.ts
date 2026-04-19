@@ -61,4 +61,18 @@ describe("renderTranslationBelow", () => {
     expect(translated.textContent).toBe("不再通用的 UI");
     expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(1);
   });
+
+  it("injects styles that inherit the source text color", () => {
+    document.body.innerHTML = `<main><p id="source" style="color: rgb(12, 34, 56)">Hello world.</p></main>`;
+    const source = document.getElementById("source") as HTMLParagraphElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "你好，世界。"
+    });
+
+    const styleTag = document.head.querySelector("[data-bilingual-translator-style='true']");
+    expect(styleTag?.textContent).toContain("color: inherit");
+    expect(styleTag?.textContent).toContain("border-top-color: currentColor");
+  });
 });
