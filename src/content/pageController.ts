@@ -26,6 +26,8 @@ type PageControllerDependencies = {
   isElementReadyForTranslation?: (element: HTMLElement) => boolean;
 };
 
+const TRANSLATION_BATCH_SIZE = 8;
+
 async function safeReportPageState(
   dependencies: PageControllerDependencies,
   state: {
@@ -50,6 +52,64 @@ function isElementNearViewport(element: HTMLElement) {
   const viewportHeight = element.ownerDocument.defaultView?.innerHeight ?? 0;
   const preloadMargin = 200;
   return rect.bottom >= -preloadMargin && rect.top <= viewportHeight + preloadMargin;
+}
+
+function chunkBlocks<T>(items: T[], chunkSize: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
+async function requestTranslationsRobust(
+  dependencies: PageControllerDependencies,
+  blocks: Array<{ blockId: string; sourceText: string }>
+) {
+  const translations: Record<string, string> = {};
+  const failedBlockIds = new Set<string>();
+  let lastError: Error | null = null;
+
+  for (const batch of chunkBlocks(blocks, TRANSLATION_BATCH_SIZE)) {
+    try {
+      const batchTranslations = await dependencies.requestTranslations(batch);
+
+      for (const block of batch) {
+        const translationText = batchTranslations[block.blockId];
+        if (translationText) {
+          translations[block.blockId] = translationText;
+        } else {
+          failedBlockIds.add(block.blockId);
+        }
+      }
+      continue;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Translation request failed.");
+    }
+
+    for (const block of batch) {
+      try {
+        const singleTranslation = await dependencies.requestTranslations([block]);
+        const translationText = singleTranslation[block.blockId];
+        if (translationText) {
+          translations[block.blockId] = translationText;
+        } else {
+          failedBlockIds.add(block.blockId);
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Translation request failed.");
+        failedBlockIds.add(block.blockId);
+      }
+    }
+  }
+
+  return {
+    translations,
+    failedBlockIds,
+    lastError
+  };
 }
 
 export function createPageController(doc: Document, dependencies: PageControllerDependencies) {
@@ -115,38 +175,20 @@ export function createPageController(doc: Document, dependencies: PageController
       });
       updateStatusPill(statusPill, { state: "translating", translatedBlockCount });
 
-      let translations: Record<string, string>;
-      try {
-        translations = await dependencies.requestTranslations(
-          candidates.map((candidate) => ({
-            blockId: candidate.blockId,
-            sourceText: candidate.sourceText
-          }))
-        );
-      } catch (error) {
-        candidates.forEach((candidate) => {
-          stateStore.set(candidate.blockId, "failed");
-          removeRenderedTranslationBlock(doc, candidate.blockId);
-        });
-        updateStatusPill(statusPill, {
-          state: "error",
-          translatedBlockCount,
-          failedBlockCount: candidates.length,
-          errorMessage: error instanceof Error ? error.message : "Translation request failed."
-        });
-        await safeReportPageState(dependencies, {
-          enabled: active,
-          translatedBlockCount,
-          pendingRequestCount: 0
-        });
-        return;
-      }
+      const { translations, failedBlockIds, lastError } = await requestTranslationsRobust(
+        dependencies,
+        candidates.map((candidate) => ({
+          blockId: candidate.blockId,
+          sourceText: candidate.sourceText
+        }))
+      );
 
       for (const candidate of candidates) {
         const translationText = translations[candidate.blockId];
         if (!translationText) {
           stateStore.set(candidate.blockId, "failed");
           removeRenderedTranslationBlock(doc, candidate.blockId);
+          failedBlockIds.add(candidate.blockId);
           continue;
         }
 
@@ -158,10 +200,20 @@ export function createPageController(doc: Document, dependencies: PageController
         translatedBlockCount += 1;
       }
 
-      updateStatusPill(statusPill, {
-        state: "translated",
-        translatedBlockCount
-      });
+      updateStatusPill(
+        statusPill,
+        failedBlockIds.size > 0
+          ? {
+              state: "error",
+              translatedBlockCount,
+              failedBlockCount: failedBlockIds.size,
+              errorMessage: lastError?.message
+            }
+          : {
+              state: "translated",
+              translatedBlockCount
+            }
+      );
       await safeReportPageState(dependencies, {
         enabled: active,
         translatedBlockCount,

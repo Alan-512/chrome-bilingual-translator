@@ -251,6 +251,52 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("falls back to per-block retries when a batch request fails", async () => {
+    const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) => {
+      if (blocks.length > 1) {
+        throw new Error("Batch parse failed");
+      }
+
+      return {
+        [blocks[0].blockId]: `ZH:${blocks[0].sourceText}`
+      };
+    });
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await controller.activate();
+
+    expect(requestTranslations).toHaveBeenCalled();
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(2);
+    expect(Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']")).every((node) => node.textContent?.includes("ZH:"))).toBe(true);
+    await controller.deactivate();
+  });
+
+  it("keeps successful translations even when one block is missing from the batch response", async () => {
+    const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) => {
+      return {
+        [blocks[0].blockId]: `ZH:${blocks[0].sourceText}`
+      };
+    });
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await controller.activate();
+
+    const rendered = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(rendered).toHaveLength(1);
+    expect(rendered[0]?.textContent).toContain("ZH:");
+    await controller.deactivate();
+  });
+
   it("deactivates and removes injected translations", async () => {
     const controller = createPageController(document, {
       requestTranslations: async (blocks) =>
