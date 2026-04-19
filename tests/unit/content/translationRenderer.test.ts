@@ -150,4 +150,33 @@ describe("renderTranslationBelow", () => {
     expect(card.style.overflow).toBe("visible");
     expect(card.style.maxHeight).toBe("none");
   });
+
+  it("relaxes card containers that are clipped via CSS rules instead of inline styles", () => {
+    document.head.innerHTML = `
+      <style>
+        .clipped-card {
+          overflow: hidden;
+          max-height: 80px;
+        }
+      </style>
+    `;
+    document.body.innerHTML = `
+      <main>
+        <article id="card" class="clipped-card">
+          <h3 id="source">OpenRouter model card title</h3>
+        </article>
+      </main>
+    `;
+    const source = document.getElementById("source") as HTMLHeadingElement;
+    const card = document.getElementById("card") as HTMLElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "OpenRouter 模型卡片标题"
+    });
+
+    expect(card.getAttribute("data-bilingual-translator-expanded")).toBe("true");
+    expect(card.style.overflow).toBe("visible");
+    expect(card.style.maxHeight).toBe("none");
+  });
 });

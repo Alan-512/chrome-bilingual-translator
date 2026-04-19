@@ -108,8 +108,19 @@ function relaxClippedAncestors(sourceElement: HTMLElement): void {
   let current: HTMLElement | null = sourceElement.parentElement;
 
   while (current) {
+    const computedStyle = current.ownerDocument.defaultView?.getComputedStyle(current);
+    const computedOverflow = computedStyle?.overflow ?? "";
+    const computedOverflowY = computedStyle?.overflowY ?? "";
+    const computedMaxHeight = computedStyle?.maxHeight ?? "";
+    const hasClippedOverflow =
+      computedOverflow === "hidden" ||
+      computedOverflow === "clip" ||
+      computedOverflowY === "hidden" ||
+      computedOverflowY === "clip";
+    const hasMaxHeightConstraint = computedMaxHeight !== "" && computedMaxHeight !== "none";
     const hasInlineClipping = current.style.overflow === "hidden" || current.style.maxHeight !== "";
-    if (hasInlineClipping) {
+
+    if (hasInlineClipping || hasClippedOverflow || hasMaxHeightConstraint) {
       current.setAttribute(EXPANDED_ATTRIBUTE, "true");
       current.style.overflow = "visible";
       current.style.maxHeight = "none";
