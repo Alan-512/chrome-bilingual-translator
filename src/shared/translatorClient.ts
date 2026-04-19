@@ -109,6 +109,35 @@ function isGeminiOpenAiCompatibilityUrl(url: string) {
   }
 }
 
+function isOpenAiOfficialUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === "api.openai.com";
+  } catch {
+    return false;
+  }
+}
+
+function buildGeminiThinkingConfig(model: string) {
+  if (/^gemini-3/i.test(model)) {
+    return {
+      thinkingConfig: {
+        thinkingLevel: "minimal"
+      }
+    };
+  }
+
+  if (/^gemini-2\.5/i.test(model)) {
+    return {
+      thinkingConfig: {
+        thinkingBudget: 0
+      }
+    };
+  }
+
+  return undefined;
+}
+
 function buildResponsesApiInput(blocks: TranslationBlockInput[]) {
   return [
     {
@@ -167,6 +196,11 @@ function buildApiTestRequest(config: ExtensionConfig) {
         "x-goog-api-key": config.apiKey
       },
       body: {
+        ...(buildGeminiThinkingConfig(config.model)
+          ? {
+              generationConfig: buildGeminiThinkingConfig(config.model)
+            }
+          : {}),
         contents: [
           {
             parts: [{ text: 'Reply with "OK" only.' }]
@@ -213,8 +247,13 @@ function buildApiTestRequest(config: ExtensionConfig) {
   };
 }
 
-function buildGeminiTranslationBody(blocks: TranslationBlockInput[]) {
+function buildGeminiTranslationBody(model: string, blocks: TranslationBlockInput[]) {
   return {
+    ...(buildGeminiThinkingConfig(model)
+      ? {
+          generationConfig: buildGeminiThinkingConfig(model)
+        }
+      : {}),
     systemInstruction: {
       parts: [
         {
@@ -310,7 +349,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                   "Content-Type": "application/json",
                   "x-goog-api-key": config.apiKey
                 },
-                body: buildGeminiTranslationBody(uncachedBlocks)
+                body: buildGeminiTranslationBody(config.model, uncachedBlocks)
               }
             : (() => {
                 const resolvedApi = resolveApiMode(config.apiBaseUrl);
@@ -327,6 +366,13 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                     resolvedApi.mode === "chat"
                       ? {
                           model: config.model,
+                          ...(isOpenAiOfficialUrl(resolvedApi.url)
+                            ? {
+                                reasoning: {
+                                  effort: "low"
+                                }
+                              }
+                            : {}),
                           ...(isGeminiChatMode
                             ? {}
                             : {
@@ -338,6 +384,13 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                         }
                       : {
                           model: config.model,
+                          ...(isOpenAiOfficialUrl(resolvedApi.url)
+                            ? {
+                                reasoning: {
+                                  effort: "low"
+                                }
+                              }
+                            : {}),
                           input: buildResponsesApiInput(uncachedBlocks)
                         }
                 };

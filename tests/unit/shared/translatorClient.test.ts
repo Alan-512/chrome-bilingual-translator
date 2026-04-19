@@ -67,6 +67,47 @@ describe("translator client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("adds low reasoning effort for official OpenAI endpoints", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body.reasoning).toEqual({ effort: "low" });
+
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  alpha: "第一段"
+                })
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
+        apiBaseUrl: "https://api.openai.com/v1/chat/completions",
+        apiKey: "secret-key",
+        model: "gpt-5-mini",
+        translateTitles: true,
+        translateShortContentBlocks: true
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(result).toEqual({ alpha: "第一段" });
+  });
+
   it("throws when the model response is missing a requested block id", async () => {
     const fetchMock = vi.fn(async () => {
       return new Response(
@@ -318,6 +359,7 @@ describe("translator client", () => {
         "x-goog-api-key": "secret-key"
       });
       const body = JSON.parse(String(init?.body));
+      expect(body.generationConfig.thinkingConfig).toEqual({ thinkingLevel: "minimal" });
       expect(body.systemInstruction.parts[0].text).toContain("strict JSON object");
       expect(body.contents[0].parts[0].text).toContain("\"blockId\": \"alpha\"");
 
@@ -359,5 +401,108 @@ describe("translator client", () => {
     });
 
     expect(result).toEqual({ alpha: "第一段" });
+  });
+
+  it("uses zero thinking budget for Gemini 2.5 native requests", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      alpha: "第一段"
+                    })
+                  }
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "google-gemini",
+        apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+        apiKey: "secret-key",
+        model: "gemini-2.5-flash",
+        translateTitles: true,
+        translateShortContentBlocks: true
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(result).toEqual({ alpha: "第一段" });
+  });
+
+  it("surfaces Gemini HTTP error bodies instead of misclassifying them as network failures", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          error: {
+            message: "Requested entity was not found.",
+            status: "NOT_FOUND"
+          }
+        }),
+        { status: 404, statusText: "Not Found", headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    await expect(
+      client.testConnection({
+        config: buildPersistedConfigRecord({
+          provider: "google-gemini",
+          apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+          apiKey: "secret-key",
+          model: "gemini-3.1-flash-lite-preview",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        })
+      })
+    ).rejects.toThrow(/requested entity was not found/i);
+  });
+
+  it("surfaces Gemini network failures with the generateContent URL", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    await expect(
+      client.testConnection({
+        config: buildPersistedConfigRecord({
+          provider: "google-gemini",
+          apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+          apiKey: "secret-key",
+          model: "gemini-3.1-flash-lite-preview",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        })
+      })
+    ).rejects.toThrow(
+      /network request to https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.1-flash-lite-preview:generateContent failed/i
+    );
   });
 });
