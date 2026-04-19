@@ -19,6 +19,7 @@ describe("config defaults", () => {
       model: "",
       translateTitles: true,
       translateShortContentBlocks: true,
+      debugMode: false,
       targetLanguage: "zh-CN"
     });
   });
@@ -33,7 +34,8 @@ describe("config persistence", () => {
       apiKey: "test-key",
       model: "gpt-4.1-mini",
       translateTitles: false,
-      translateShortContentBlocks: true
+      translateShortContentBlocks: true,
+      debugMode: true
     });
 
     await saveExtensionConfig(storage, persisted);
@@ -47,6 +49,7 @@ describe("config persistence", () => {
       model: "gpt-4.1-mini",
       translateTitles: false,
       translateShortContentBlocks: true,
+      debugMode: true,
       targetLanguage: "zh-CN"
     });
   });

@@ -22,6 +22,7 @@ type OptionsFormControls = {
   model: HTMLInputElement;
   translateTitles: HTMLInputElement;
   translateShortContentBlocks: HTMLInputElement;
+  debugMode: HTMLInputElement;
   status: HTMLElement;
 };
 
@@ -34,6 +35,7 @@ function queryControls(doc: Document): OptionsFormControls {
   const model = doc.querySelector<HTMLInputElement>("[name='model']");
   const translateTitles = doc.querySelector<HTMLInputElement>("[name='translateTitles']");
   const translateShortContentBlocks = doc.querySelector<HTMLInputElement>("[name='translateShortContentBlocks']");
+  const debugMode = doc.querySelector<HTMLInputElement>("[name='debugMode']");
   const status = doc.querySelector<HTMLElement>("[data-role='status']");
 
   if (
@@ -45,6 +47,7 @@ function queryControls(doc: Document): OptionsFormControls {
     !model ||
     !translateTitles ||
     !translateShortContentBlocks ||
+    !debugMode ||
     !status
   ) {
     throw new Error("Options page controls are missing.");
@@ -59,6 +62,7 @@ function queryControls(doc: Document): OptionsFormControls {
     model,
     translateTitles,
     translateShortContentBlocks,
+    debugMode,
     status
   };
 }
@@ -101,7 +105,8 @@ function collectFormInput(controls: OptionsFormControls): PersistedExtensionConf
     apiKey: controls.apiKey.value.trim(),
     model: controls.model.value.trim(),
     translateTitles: controls.translateTitles.checked,
-    translateShortContentBlocks: controls.translateShortContentBlocks.checked
+    translateShortContentBlocks: controls.translateShortContentBlocks.checked,
+    debugMode: controls.debugMode.checked
   };
 }
 
@@ -171,6 +176,7 @@ export async function mountOptionsPage(
   controls.model.value = savedConfig.model;
   controls.translateTitles.checked = savedConfig.translateTitles;
   controls.translateShortContentBlocks.checked = savedConfig.translateShortContentBlocks;
+  controls.debugMode.checked = savedConfig.debugMode;
   setStatus(controls.status, "Ready to save configuration.");
 
   controls.provider.addEventListener("change", () => {

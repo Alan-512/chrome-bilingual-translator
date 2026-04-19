@@ -12,6 +12,7 @@ export type PersistedExtensionConfigInput = {
   model: string;
   translateTitles: boolean;
   translateShortContentBlocks: boolean;
+  debugMode: boolean;
 };
 
 export type ExtensionConfig = PersistedExtensionConfigInput & {
@@ -27,6 +28,7 @@ export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
   model: "",
   translateTitles: true,
   translateShortContentBlocks: true,
+  debugMode: false,
   targetLanguage: TARGET_LANGUAGE
 };
 

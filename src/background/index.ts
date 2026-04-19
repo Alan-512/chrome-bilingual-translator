@@ -37,7 +37,12 @@ async function sendLifecycleMessage(tabId: number, type: "page/activate" | "page
     files: ["dist/content.js"]
   });
 
-  await chrome.tabs.sendMessage(tabId, { type, tabId });
+  const config = type === "page/activate" ? await loadExtensionConfig(localStorageArea) : null;
+  await chrome.tabs.sendMessage(tabId, {
+    type,
+    tabId,
+    ...(type === "page/activate" ? { debugMode: config?.debugMode ?? false } : {})
+  });
 }
 
 async function bootstrap() {

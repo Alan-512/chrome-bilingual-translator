@@ -24,6 +24,7 @@ type PageControllerDependencies = {
   }) => Promise<void>;
   createObserverCoordinator?: (doc: Document) => ObserverCoordinatorLike;
   isElementReadyForTranslation?: (element: HTMLElement) => boolean;
+  debugLog?: (event: string, detail?: Record<string, unknown>) => void;
 };
 
 const TRANSLATION_BATCH_SIZE = 12;
@@ -130,6 +131,7 @@ export function createPageController(doc: Document, dependencies: PageController
   const statusPill = ensureStatusPill(doc);
   const observerCoordinator = (dependencies.createObserverCoordinator ?? createObserverCoordinator)(doc);
   const isElementReadyForTranslation = dependencies.isElementReadyForTranslation ?? isElementNearViewport;
+  const debugLog = dependencies.debugLog ?? (() => {});
   let active = false;
   let translatedBlockCount = 0;
   let pendingBlockCount = 0;
@@ -190,6 +192,10 @@ export function createPageController(doc: Document, dependencies: PageController
   }
 
   async function processBatch(batch: CandidateBlock[]) {
+    debugLog("batch/request", {
+      batchSize: batch.length,
+      blockIds: batch.map((candidate) => candidate.blockId)
+    });
     const batchResult = await requestBatchRobust(
       dependencies,
       batch.map((candidate) => ({
@@ -208,6 +214,11 @@ export function createPageController(doc: Document, dependencies: PageController
         removeRenderedTranslationBlock(doc, candidate.blockId);
         failedBlockIds.add(candidate.blockId);
         inFlightSignatures.delete(getCandidateSignature(candidate));
+        debugLog("block/failed", {
+          blockId: candidate.blockId,
+          signature: getCandidateSignature(candidate),
+          sourceText: candidate.sourceText
+        });
         continue;
       }
 
@@ -221,6 +232,12 @@ export function createPageController(doc: Document, dependencies: PageController
       failedBlockIds.delete(candidate.blockId);
       stateStore.set(candidate.blockId, "translated");
       translatedBlockCount += 1;
+      debugLog("block/translated", {
+        blockId: candidate.blockId,
+        signature: getCandidateSignature(candidate),
+        sourceText: candidate.sourceText,
+        translationText
+      });
     }
 
     await syncPageState();
@@ -245,6 +262,11 @@ export function createPageController(doc: Document, dependencies: PageController
 
   async function processCandidates(targetElements?: HTMLElement[]) {
     const candidates = getEligibleCandidates(targetElements);
+    debugLog("candidates/collected", {
+      requestedTargetCount: targetElements?.length ?? 0,
+      eligibleCount: candidates.length,
+      blockIds: candidates.map((candidate) => candidate.blockId)
+    });
 
     if (candidates.length === 0) {
       await syncPageState();
@@ -257,11 +279,21 @@ export function createPageController(doc: Document, dependencies: PageController
       const cachedTranslation = translationMemory.get(getCandidateSignature(candidate));
       if (!cachedTranslation) {
         if (inFlightSignatures.has(getCandidateSignature(candidate))) {
+          debugLog("candidate/skipped-inflight-duplicate", {
+            blockId: candidate.blockId,
+            signature: getCandidateSignature(candidate),
+            sourceText: candidate.sourceText
+          });
           continue;
         }
 
         inFlightSignatures.add(getCandidateSignature(candidate));
         candidatesNeedingRequests.push(candidate);
+        debugLog("candidate/queued", {
+          blockId: candidate.blockId,
+          signature: getCandidateSignature(candidate),
+          sourceText: candidate.sourceText
+        });
         continue;
       }
 
@@ -271,6 +303,11 @@ export function createPageController(doc: Document, dependencies: PageController
         sourceText: candidate.sourceText
       });
       stateStore.set(candidate.blockId, "translated");
+      debugLog("candidate/rehydrated-from-memory", {
+        blockId: candidate.blockId,
+        signature: getCandidateSignature(candidate),
+        sourceText: candidate.sourceText
+      });
     }
 
     if (candidatesNeedingRequests.length === 0) {

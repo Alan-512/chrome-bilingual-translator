@@ -11,6 +11,7 @@ declare global {
 
 function bootstrapContentRuntime() {
   let currentTabId = 0;
+  let debugMode = false;
   const controller = createPageController(document, {
     async requestTranslations(blocks) {
       try {
@@ -45,17 +46,26 @@ function bootstrapContentRuntime() {
           throw error;
         }
       }
+    },
+    debugLog(event, detail) {
+      if (!debugMode) {
+        return;
+      }
+
+      console.debug("[bilingual]", event, detail ?? {});
     }
   });
 
   const runtimeListener = (message: { type?: string; tabId?: number }) => {
     if (message?.type === "page/activate" && typeof message.tabId === "number") {
       currentTabId = message.tabId;
+      debugMode = Boolean((message as { debugMode?: boolean }).debugMode);
       void controller.activate();
     }
 
     if (message?.type === "page/deactivate" && typeof message.tabId === "number") {
       currentTabId = message.tabId;
+      debugMode = false;
       void controller.deactivate();
     }
   };

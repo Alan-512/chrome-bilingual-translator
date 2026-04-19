@@ -1,6 +1,7 @@
 export type ActivatePageTranslationMessage = {
   type: "page/activate";
   tabId: number;
+  debugMode: boolean;
 };
 
 export type DeactivatePageTranslationMessage = {
