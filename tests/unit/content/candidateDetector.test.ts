@@ -67,6 +67,7 @@ describe("collectCandidateBlocks", () => {
   });
 
   it("groups Reddit shreddit feed titles and body previews into a single card block", () => {
+    window.history.replaceState({}, "", "/r/vibecoding/");
     document.body.innerHTML = `
       <main>
         <shreddit-post>
@@ -86,6 +87,7 @@ describe("collectCandidateBlocks", () => {
   });
 
   it("groups Reddit text-body containers with semantic children into a single card block", () => {
+    window.history.replaceState({}, "", "/r/vibecoding/");
     document.body.innerHTML = `
       <main>
         <shreddit-post>

@@ -176,6 +176,7 @@ describe("pageController", () => {
   });
 
   it("translates Reddit feed cards as a single combined block below the preview body", async () => {
+    window.history.replaceState({}, "", "/r/codex/");
     document.body.innerHTML = `
       <main>
         <shreddit-post>
