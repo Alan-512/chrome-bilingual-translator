@@ -40,7 +40,9 @@ type ResponsesApiResponse = {
 
 async function readApiErrorMessage(response: Response): Promise<string> {
   try {
-    const payload = (await response.json()) as { error?: { message?: string } };
+    const payload = (await response.json()) as
+      | { error?: { message?: string } }
+      | { error?: { message?: string; status?: string; details?: unknown[] } };
     const message = payload.error?.message?.trim();
     if (message) {
       return message;
@@ -83,6 +85,18 @@ function resolveApiMode(apiBaseUrl: string) {
   }
 
   return { mode: "responses" as const, url: `${normalized}/responses` };
+}
+
+function isGeminiOpenAiCompatibilityUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.hostname === "generativelanguage.googleapis.com" &&
+      parsed.pathname.includes("/openai/")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function buildResponsesApiInput(blocks: TranslationBlockInput[]) {
@@ -214,6 +228,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
 
       try {
         const resolvedApi = resolveApiMode(config.apiBaseUrl);
+        const isGeminiChatMode = resolvedApi.mode === "chat" && isGeminiOpenAiCompatibilityUrl(resolvedApi.url);
         const response = await options.fetchImpl(resolvedApi.url, {
           method: "POST",
           headers: {
@@ -224,9 +239,13 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
             resolvedApi.mode === "chat"
               ? {
                   model: config.model,
-                  response_format: {
-                    type: "json_object"
-                  },
+                  ...(isGeminiChatMode
+                    ? {}
+                    : {
+                        response_format: {
+                          type: "json_object"
+                        }
+                      }),
                   messages: buildTranslationMessages(uncachedBlocks)
                 }
               : {

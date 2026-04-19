@@ -204,6 +204,51 @@ describe("translator client", () => {
     expect(result).toEqual({ alpha: "第一段" });
   });
 
+  it("avoids json_object response_format for Gemini OpenAI compatibility chat completions", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+      const body = JSON.parse(String(init?.body));
+      expect(body.model).toBe("gemini-3.1-flash-lite-preview");
+      expect(body.response_format).toBeUndefined();
+      expect(body.messages[0].role).toBe("system");
+      expect(body.messages[0].content).toContain("strict JSON object");
+      expect(body.messages[1].content).toContain("\"blockId\": \"alpha\"");
+
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  alpha: "第一段"
+                })
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        apiKey: "secret-key",
+        model: "gemini-3.1-flash-lite-preview",
+        translateTitles: true,
+        translateShortContentBlocks: true
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(result).toEqual({ alpha: "第一段" });
+  });
+
   it("surfaces a readable timeout error instead of the raw abort signal message", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       return await new Promise<Response>((_resolve, reject) => {
