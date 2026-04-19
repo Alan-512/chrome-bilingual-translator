@@ -222,6 +222,45 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("re-hydrates visible translations after the host rerenders the same content", async () => {
+    let mutationCallback: (() => void) | undefined;
+    const requestTranslations = vi.fn(async (blocks) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          mutationCallback = callbacks.onMutation;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    await controller.activate();
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(2);
+
+    document.body.innerHTML = `
+      <main>
+        <h2>Build Check</h2>
+        <p>Hello world from a real content paragraph.</p>
+      </main>
+    `;
+
+    mutationCallback?.();
+    await settlePromises();
+
+    const translatedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(translatedBlocks).toHaveLength(2);
+    expect(translatedBlocks.every((node) => node.textContent?.includes("ZH:"))).toBe(true);
+    await controller.deactivate();
+  });
+
   it("renders inline loading placeholders while translation is pending", async () => {
     let resolveTranslations: ((value: Record<string, string>) => void) | undefined;
     const requestTranslations = vi.fn(

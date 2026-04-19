@@ -35,6 +35,15 @@ type QueuedBatch = {
   resolve: () => void;
 };
 
+function normalizeSourceText(text: string) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function getCandidateSignature(candidate: { element: HTMLElement; sourceText: string }) {
+  const slotName = candidate.element.getAttribute("slot") ?? "";
+  return `${candidate.element.tagName}|${slotName}|${normalizeSourceText(candidate.sourceText)}`;
+}
+
 async function safeReportPageState(
   dependencies: PageControllerDependencies,
   state: {
@@ -128,6 +137,7 @@ export function createPageController(doc: Document, dependencies: PageController
   let lastError: Error | null = null;
   const failedBlockIds = new Set<string>();
   const queuedBatches: QueuedBatch[] = [];
+  const translationMemory = new Map<string, string>();
 
   async function syncPageState() {
     updateStatusPill(
@@ -204,6 +214,7 @@ export function createPageController(doc: Document, dependencies: PageController
         translationText,
         sourceText: candidate.sourceText
       });
+      translationMemory.set(getCandidateSignature(candidate), translationText);
       failedBlockIds.delete(candidate.blockId);
       stateStore.set(candidate.blockId, "translated");
       translatedBlockCount += 1;
@@ -237,8 +248,30 @@ export function createPageController(doc: Document, dependencies: PageController
       return;
     }
 
-    observerCoordinator.observeCandidates(candidates.map((candidate) => candidate.element));
-    const batchPromises = chunkBlocks(candidates, TRANSLATION_BATCH_SIZE).map((candidateBatch) => {
+    const candidatesNeedingRequests: CandidateBlock[] = [];
+
+    for (const candidate of candidates) {
+      const cachedTranslation = translationMemory.get(getCandidateSignature(candidate));
+      if (!cachedTranslation) {
+        candidatesNeedingRequests.push(candidate);
+        continue;
+      }
+
+      renderTranslationBelow(candidate.element, {
+        blockId: candidate.blockId,
+        translationText: cachedTranslation,
+        sourceText: candidate.sourceText
+      });
+      stateStore.set(candidate.blockId, "translated");
+    }
+
+    if (candidatesNeedingRequests.length === 0) {
+      await syncPageState();
+      return;
+    }
+
+    observerCoordinator.observeCandidates(candidatesNeedingRequests.map((candidate) => candidate.element));
+    const batchPromises = chunkBlocks(candidatesNeedingRequests, TRANSLATION_BATCH_SIZE).map((candidateBatch) => {
       candidateBatch.forEach((candidate) => {
         stateStore.set(candidate.blockId, "pending");
         renderTranslationLoadingBelow(candidate.element, {
@@ -287,6 +320,10 @@ export function createPageController(doc: Document, dependencies: PageController
                 .filter((candidate) => !stateStore.has(candidate.blockId))
                 .map((candidate) => candidate.element);
               observerCoordinator.observeCandidates(nextCandidates);
+              const readyElements = nextCandidates.filter((element) => isElementReadyForTranslation(element));
+              if (readyElements.length > 0) {
+                void processCandidates(readyElements);
+              }
             }
           }
         );
@@ -322,6 +359,7 @@ export function createPageController(doc: Document, dependencies: PageController
       lastError = null;
       failedBlockIds.clear();
       queuedBatches.length = 0;
+      translationMemory.clear();
       observerCoordinator.disconnect();
       removeRenderedTranslations(doc);
       stateStore.clear();
