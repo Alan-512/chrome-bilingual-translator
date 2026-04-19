@@ -433,6 +433,37 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("retries failed blocks when activate is triggered again", async () => {
+    let attempt = 0;
+    const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) => {
+      attempt += 1;
+
+      if (attempt <= 3) {
+        throw new Error("Temporary upstream failure");
+      }
+
+      return Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]));
+    });
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await controller.activate();
+    expect(document.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
+    const callCountAfterFailure = requestTranslations.mock.calls.length;
+
+    await controller.activate();
+
+    const rendered = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(requestTranslations.mock.calls.length).toBeGreaterThan(callCountAfterFailure);
+    expect(rendered).toHaveLength(2);
+    expect(rendered.every((node) => node.textContent?.includes("ZH:"))).toBe(true);
+    await controller.deactivate();
+  });
+
   it("deactivates and removes injected translations", async () => {
     const controller = createPageController(document, {
       requestTranslations: async (blocks) =>

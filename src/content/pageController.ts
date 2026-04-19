@@ -161,7 +161,8 @@ export function createPageController(doc: Document, dependencies: PageController
     const targetSet = targetElements ? new Set(targetElements) : null;
 
     return collectCandidateBlocks(doc).filter((candidate) => {
-      if (stateStore.has(candidate.blockId)) {
+      const currentState = stateStore.get(candidate.blockId);
+      if (currentState === "queued" || currentState === "pending" || currentState === "translated") {
         return false;
       }
 
