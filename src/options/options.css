@@ -64,14 +64,52 @@ h1 {
   font-weight: 600;
 }
 
-.field input {
+.field input,
+.field select {
   width: 100%;
   border: 1px solid rgba(29, 31, 36, 0.14);
   border-radius: 12px;
+  min-height: 50px;
   padding: 12px 14px;
   font: inherit;
   color: inherit;
   background: #fffdf9;
+  box-sizing: border-box;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+.field select {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 44px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(138, 90, 37, 0.92) 50%),
+    linear-gradient(135deg, rgba(138, 90, 37, 0.92) 50%, transparent 50%),
+    linear-gradient(180deg, #fffdf9 0%, #fffaf1 100%);
+  background-position:
+    calc(100% - 22px) calc(50% - 2px),
+    calc(100% - 16px) calc(50% - 2px),
+    0 0;
+  background-size:
+    6px 6px,
+    6px 6px,
+    100% 100%;
+  background-repeat: no-repeat;
+}
+
+.field input:hover,
+.field select:hover {
+  border-color: rgba(138, 90, 37, 0.28);
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: rgba(214, 110, 34, 0.6);
+  box-shadow: 0 0 0 4px rgba(234, 158, 67, 0.16);
 }
 
 .toggle {
