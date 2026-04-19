@@ -200,7 +200,8 @@ export function createPageController(doc: Document, dependencies: PageController
 
       renderTranslationBelow(candidate.element, {
         blockId: candidate.blockId,
-        translationText
+        translationText,
+        sourceText: candidate.sourceText
       });
       failedBlockIds.delete(candidate.blockId);
       stateStore.set(candidate.blockId, "translated");

@@ -1,6 +1,7 @@
 type RenderTranslationInput = {
   blockId: string;
   translationText: string;
+  sourceText?: string;
   tightLayout?: boolean;
 };
 
@@ -13,6 +14,8 @@ const OWNED_ATTRIBUTE = "data-bilingual-translator-owned";
 const BLOCK_ID_ATTRIBUTE = "data-bilingual-translator-block-id";
 const STATE_ATTRIBUTE = "data-bilingual-translator-state";
 const STYLE_ATTRIBUTE = "data-bilingual-translator-style";
+const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
+const FALLBACK_SOURCE_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [slot='title'], [slot='text-body']";
 
 function ensureTranslationStyles(doc: Document): void {
   if (doc.head?.querySelector(`[${STYLE_ATTRIBUTE}='true']`)) {
@@ -82,6 +85,51 @@ function getOrCreateTranslationElement(sourceElement: HTMLElement, blockId: stri
   return translationElement;
 }
 
+function normalizeText(text: string | null | undefined): string {
+  return text?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+function resolveLiveSourceElement(
+  sourceElement: HTMLElement,
+  blockId: string,
+  sourceText?: string
+): HTMLElement {
+  if (sourceElement.isConnected) {
+    return sourceElement;
+  }
+
+  const doc = sourceElement.ownerDocument;
+  const bySourceId = doc.querySelector<HTMLElement>(`[${SOURCE_ID_ATTRIBUTE}='${blockId}']`);
+  if (bySourceId) {
+    return bySourceId;
+  }
+
+  const normalizedSourceText = normalizeText(sourceText);
+  if (!normalizedSourceText) {
+    return sourceElement;
+  }
+
+  const sourceSlot = sourceElement.getAttribute("slot");
+  const sourceTagName = sourceElement.tagName;
+  const exactMatch = Array.from(doc.querySelectorAll<HTMLElement>(FALLBACK_SOURCE_SELECTOR)).find((element) => {
+    if (element.getAttribute(OWNED_ATTRIBUTE) === "true") {
+      return false;
+    }
+
+    if (element.tagName !== sourceTagName) {
+      return false;
+    }
+
+    if ((element.getAttribute("slot") ?? null) !== sourceSlot) {
+      return false;
+    }
+
+    return normalizeText(element.textContent) === normalizedSourceText;
+  });
+
+  return exactMatch ?? sourceElement;
+}
+
 export function renderTranslationLoadingBelow(
   sourceElement: HTMLElement,
   input: RenderTranslationLoadingInput
@@ -109,7 +157,8 @@ export function renderTranslationLoadingBelow(
 }
 
 export function renderTranslationBelow(sourceElement: HTMLElement, input: RenderTranslationInput): HTMLElement {
-  const translationElement = getOrCreateTranslationElement(sourceElement, input.blockId);
+  const liveSourceElement = resolveLiveSourceElement(sourceElement, input.blockId, input.sourceText);
+  const translationElement = getOrCreateTranslationElement(liveSourceElement, input.blockId);
   translationElement.setAttribute(STATE_ATTRIBUTE, "translated");
   translationElement.textContent = input.translationText;
 

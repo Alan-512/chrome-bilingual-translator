@@ -76,4 +76,33 @@ describe("renderTranslationBelow", () => {
     expect(styleTag?.textContent).toContain("border-top-color: currentColor");
     expect(styleTag?.textContent).toContain("border-bottom: 2px dashed");
   });
+
+  it("re-attaches the translated result when the source node was replaced during rendering", () => {
+    document.body.innerHTML = `
+      <main>
+        <div id="card">
+          <a id="source" slot="title">A Reddit feed title that should be translated</a>
+        </div>
+      </main>
+    `;
+    const source = document.getElementById("source") as HTMLElement;
+
+    renderTranslationLoadingBelow(source, {
+      blockId: "alpha"
+    });
+
+    document.getElementById("card")!.innerHTML =
+      `<a id="replacement" slot="title">A Reddit feed title that should be translated</a>`;
+    const replacement = document.getElementById("replacement") as HTMLElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "一条应该被翻译的 Reddit 首页标题",
+      sourceText: "A Reddit feed title that should be translated"
+    });
+
+    const translation = replacement.nextElementSibling as HTMLElement;
+    expect(translation.dataset.bilingualTranslatorOwned).toBe("true");
+    expect(translation.textContent).toBe("一条应该被翻译的 Reddit 首页标题");
+  });
 });
