@@ -261,6 +261,56 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("does not queue the same visible content twice while its first request is still pending", async () => {
+    let mutationCallback: (() => void) | undefined;
+    let resolveTranslations: ((value: Record<string, string>) => void) | undefined;
+    const requestTranslations = vi.fn(
+      (blocks: Array<{ blockId: string; sourceText: string }>) =>
+        new Promise<Record<string, string>>((resolve) => {
+          resolveTranslations = resolve;
+        })
+    );
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          mutationCallback = callbacks.onMutation;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    const activationPromise = controller.activate();
+    await settlePromises();
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+
+    document.body.innerHTML = `
+      <main>
+        <h2>Build Check</h2>
+        <p>Hello world from a real content paragraph.</p>
+      </main>
+    `;
+    mutationCallback?.();
+    await settlePromises();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+
+    const firstBatchBlocks = requestTranslations.mock.calls[0]?.[0] as Array<{ blockId: string; sourceText: string }>;
+    resolveTranslations?.(
+      Object.fromEntries(firstBatchBlocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    await activationPromise;
+
+    const translatedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(translatedBlocks).toHaveLength(2);
+    expect(translatedBlocks.every((node) => node.textContent?.includes("ZH:"))).toBe(true);
+    await controller.deactivate();
+  });
+
   it("renders inline loading placeholders while translation is pending", async () => {
     let resolveTranslations: ((value: Record<string, string>) => void) | undefined;
     const requestTranslations = vi.fn(

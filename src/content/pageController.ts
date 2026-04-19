@@ -138,6 +138,7 @@ export function createPageController(doc: Document, dependencies: PageController
   const failedBlockIds = new Set<string>();
   const queuedBatches: QueuedBatch[] = [];
   const translationMemory = new Map<string, string>();
+  const inFlightSignatures = new Set<string>();
 
   async function syncPageState() {
     updateStatusPill(
@@ -206,6 +207,7 @@ export function createPageController(doc: Document, dependencies: PageController
         stateStore.set(candidate.blockId, "failed");
         removeRenderedTranslationBlock(doc, candidate.blockId);
         failedBlockIds.add(candidate.blockId);
+        inFlightSignatures.delete(getCandidateSignature(candidate));
         continue;
       }
 
@@ -215,6 +217,7 @@ export function createPageController(doc: Document, dependencies: PageController
         sourceText: candidate.sourceText
       });
       translationMemory.set(getCandidateSignature(candidate), translationText);
+      inFlightSignatures.delete(getCandidateSignature(candidate));
       failedBlockIds.delete(candidate.blockId);
       stateStore.set(candidate.blockId, "translated");
       translatedBlockCount += 1;
@@ -253,6 +256,11 @@ export function createPageController(doc: Document, dependencies: PageController
     for (const candidate of candidates) {
       const cachedTranslation = translationMemory.get(getCandidateSignature(candidate));
       if (!cachedTranslation) {
+        if (inFlightSignatures.has(getCandidateSignature(candidate))) {
+          continue;
+        }
+
+        inFlightSignatures.add(getCandidateSignature(candidate));
         candidatesNeedingRequests.push(candidate);
         continue;
       }
@@ -360,6 +368,7 @@ export function createPageController(doc: Document, dependencies: PageController
       failedBlockIds.clear();
       queuedBatches.length = 0;
       translationMemory.clear();
+      inFlightSignatures.clear();
       observerCoordinator.disconnect();
       removeRenderedTranslations(doc);
       stateStore.clear();
