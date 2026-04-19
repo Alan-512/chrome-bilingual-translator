@@ -1,5 +1,5 @@
 import { classifyPage } from "./pageClassifier";
-import { collectRedditCandidateBlock } from "./siteAdapters/redditCandidateAdapter";
+import { collectSiteCandidateBlock } from "./siteAdapters";
 
 export type CandidateBlock = {
   blockId: string;
@@ -62,12 +62,9 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
       return;
     }
 
-    const groupedFeedCard =
-      page.site === "reddit"
-        ? collectRedditCandidateBlock(element, page, {
-            getStableBlockId
-          })
-        : null;
+    const groupedFeedCard = collectSiteCandidateBlock(element, page, {
+      getStableBlockId
+    });
     if (groupedFeedCard) {
       if (groupedFeedCardIds.has(groupedFeedCard.blockId)) {
         return;

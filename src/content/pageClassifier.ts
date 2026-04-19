@@ -1,6 +1,6 @@
 export type PageClassification = {
-  site: "reddit" | "generic";
-  surface: "listing" | "detail" | "generic";
+  site: "reddit" | "github" | "generic";
+  surface: "listing" | "detail" | "repo-home" | "repo-subpage" | "generic";
 };
 
 export function classifyPage(doc: Document): PageClassification {
@@ -20,6 +20,29 @@ export function classifyPage(doc: Document): PageClassification {
     return {
       site: "reddit",
       surface: "listing"
+    };
+  }
+
+  if (/(\.|^)github\.com$/i.test(host)) {
+    const pathSegments = pathname.split("/").filter(Boolean);
+
+    if (pathSegments.length === 2) {
+      return {
+        site: "github",
+        surface: "repo-home"
+      };
+    }
+
+    if (pathSegments.length >= 3) {
+      return {
+        site: "github",
+        surface: "repo-subpage"
+      };
+    }
+
+    return {
+      site: "github",
+      surface: "generic"
     };
   }
 
