@@ -183,6 +183,10 @@ function toTimeoutErrorMessage(timeoutMs: number) {
   return `API request timed out after ${seconds}.`;
 }
 
+function toNetworkErrorMessage(url: string) {
+  return `Network request to ${url} failed before receiving a response. Check whether this API host is reachable and not blocked by proxy, firewall, DNS, or TLS issues.`;
+}
+
 export function createTranslatorClient(options: CreateTranslatorClientOptions): TranslatorClient {
   const timeoutMs = options.timeoutMs ?? 30_000;
 
@@ -268,6 +272,10 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           throw new Error(toTimeoutErrorMessage(timeoutMs));
         }
 
+        if (error instanceof TypeError) {
+          throw new Error(toNetworkErrorMessage(resolveApiMode(config.apiBaseUrl).url));
+        }
+
         throw error;
       } finally {
         clearTimeout(timeout);
@@ -277,9 +285,9 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
     async testConnection({ config }) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      const request = buildApiTestRequest(config);
 
       try {
-        const request = buildApiTestRequest(config);
         const response = await options.fetchImpl(request.url, {
           method: "POST",
           headers: {
@@ -296,6 +304,10 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) {
           throw new Error(toTimeoutErrorMessage(timeoutMs));
+        }
+
+        if (error instanceof TypeError) {
+          throw new Error(toNetworkErrorMessage(request.url));
         }
 
         throw error;

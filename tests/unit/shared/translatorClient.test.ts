@@ -231,4 +231,27 @@ describe("translator client", () => {
       })
     ).rejects.toThrow(/timed out after 10ms/i);
   });
+
+  it("surfaces a readable network error instead of the raw failed to fetch message", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    await expect(
+      client.testConnection({
+        config: buildPersistedConfigRecord({
+          apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+          apiKey: "secret-key",
+          model: "ep-20260321184346-rlw84",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        })
+      })
+    ).rejects.toThrow(/network request to https:\/\/ark\.cn-beijing\.volces\.com\/api\/v3\/responses failed/i);
+  });
 });
