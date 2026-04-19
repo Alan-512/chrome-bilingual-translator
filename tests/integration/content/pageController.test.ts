@@ -175,6 +175,50 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("translates Reddit feed cards as a single combined block below the preview body", async () => {
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a slot="title">Kimi k2.6 Code Preview might be the current Open-code SOTA.</a>
+          <div slot="text-body">
+            <p>I might be overhyping this, but I'm genuinely blown away right now.</p>
+            <p>I've been testing it on a heavy production-level task.</p>
+          </div>
+        </shreddit-post>
+      </main>
+    `;
+
+    const requestTranslations = vi.fn(async (blocks) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await controller.activate();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(requestTranslations.mock.calls[0]?.[0]).toEqual([
+      {
+        blockId: expect.any(String),
+        sourceText:
+          "Kimi k2.6 Code Preview might be the current Open-code SOTA.\n\n" +
+          "I might be overhyping this, but I'm genuinely blown away right now.\n\n" +
+          "I've been testing it on a heavy production-level task."
+      }
+    ]);
+
+    const previewBody = document.querySelector("[slot='text-body']") as HTMLElement;
+    const translation = previewBody.nextElementSibling as HTMLElement;
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(1);
+    expect(translation?.dataset.bilingualTranslatorOwned).toBe("true");
+    expect(translation?.textContent).toContain("ZH:Kimi k2.6 Code Preview might be the current Open-code SOTA.");
+    await controller.deactivate();
+  });
+
   it("observes dynamically added content without translating it until it becomes visible", async () => {
     let mutationCallback: (() => void) | undefined;
     let visibleCallback: ((elements: HTMLElement[]) => void) | undefined;

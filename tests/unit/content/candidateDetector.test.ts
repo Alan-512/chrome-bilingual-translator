@@ -66,7 +66,7 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[0]?.sourceText).toBe("Original user content.");
   });
 
-  it("detects Reddit shreddit feed titles and body previews", () => {
+  it("groups Reddit shreddit feed titles and body previews into a single card block", () => {
     document.body.innerHTML = `
       <main>
         <shreddit-post>
@@ -78,16 +78,18 @@ describe("collectCandidateBlocks", () => {
 
     const blocks = collectCandidateBlocks(document);
 
-    expect(blocks.map((block) => block.sourceText)).toEqual([
-      "A Reddit feed title that should be translated",
-      "A feed preview paragraph that is shown on the homepage card."
-    ]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.element.getAttribute("slot")).toBe("text-body");
+    expect(blocks[0]?.sourceText).toBe(
+      "A Reddit feed title that should be translated\n\nA feed preview paragraph that is shown on the homepage card."
+    );
   });
 
-  it("avoids duplicating Reddit text-body containers when semantic children already exist", () => {
+  it("groups Reddit text-body containers with semantic children into a single card block", () => {
     document.body.innerHTML = `
       <main>
         <shreddit-post>
+          <a slot="title">A Reddit feed title that should be translated</a>
           <div slot="text-body">
             <p>First body paragraph.</p>
             <p>Second body paragraph.</p>
@@ -98,6 +100,10 @@ describe("collectCandidateBlocks", () => {
 
     const blocks = collectCandidateBlocks(document);
 
-    expect(blocks.map((block) => block.sourceText)).toEqual(["First body paragraph.", "Second body paragraph."]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.element.getAttribute("slot")).toBe("text-body");
+    expect(blocks[0]?.sourceText).toBe(
+      "A Reddit feed title that should be translated\n\nFirst body paragraph.\n\nSecond body paragraph."
+    );
   });
 });
