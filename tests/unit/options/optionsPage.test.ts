@@ -21,7 +21,6 @@ function renderOptionsDom() {
             API Base URL
             <input name="apiBaseUrl" type="url" />
           </label>
-          <p data-role="api-origin-preview"></p>
           <label>
             API Key
             <input name="apiKey" type="password" />
@@ -156,24 +155,6 @@ describe("mountOptionsPage", () => {
     expect(savedConfig.apiBaseUrl).toBe("");
     expect(document.querySelector("[data-role='toast']")?.textContent).toContain("HTTPS");
     expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("error");
-  });
-
-  it("shows the destination origin for the configured API URL", async () => {
-    const storage = createMemoryStorageArea();
-
-    await mountOptionsPage(document, {
-      storageArea: storage,
-      requestApiOriginPermission: async () => true,
-      testApiConnection: async () => undefined
-    });
-
-    const input = document.querySelector("[name='apiBaseUrl']") as HTMLInputElement;
-    input.value = "https://ark.cn-beijing.volces.com/api/v3/chat/completions";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-
-    expect(document.querySelector("[data-role='api-origin-preview']")?.textContent).toContain(
-      "ark.cn-beijing.volces.com"
-    );
   });
 
   it("tests the current API configuration without overwriting saved settings", async () => {

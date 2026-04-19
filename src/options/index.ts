@@ -3,7 +3,6 @@ import {
   GEMINI_PROVIDER,
   buildPersistedConfigRecord,
   getApiBaseUrlSecurityError,
-  normalizeApiBaseUrlToOrigin,
   type PersistedExtensionConfigInput
 } from "../shared/config";
 import { createChromeStorageArea, loadExtensionConfig, saveExtensionConfig, type StorageAreaLike } from "../shared/storage";
@@ -24,7 +23,6 @@ type OptionsFormControls = {
   translateTitles: HTMLInputElement;
   translateShortContentBlocks: HTMLInputElement;
   status: HTMLElement;
-  apiOriginPreview: HTMLElement;
 };
 
 function queryControls(doc: Document): OptionsFormControls {
@@ -37,7 +35,6 @@ function queryControls(doc: Document): OptionsFormControls {
   const translateTitles = doc.querySelector<HTMLInputElement>("[name='translateTitles']");
   const translateShortContentBlocks = doc.querySelector<HTMLInputElement>("[name='translateShortContentBlocks']");
   const status = doc.querySelector<HTMLElement>("[data-role='status']");
-  const apiOriginPreview = doc.querySelector<HTMLElement>("[data-role='api-origin-preview']");
 
   if (
     !form ||
@@ -48,8 +45,7 @@ function queryControls(doc: Document): OptionsFormControls {
     !model ||
     !translateTitles ||
     !translateShortContentBlocks ||
-    !status ||
-    !apiOriginPreview
+    !status
   ) {
     throw new Error("Options page controls are missing.");
   }
@@ -63,8 +59,7 @@ function queryControls(doc: Document): OptionsFormControls {
     model,
     translateTitles,
     translateShortContentBlocks,
-    status,
-    apiOriginPreview
+    status
   };
 }
 
@@ -110,11 +105,6 @@ function collectFormInput(controls: OptionsFormControls): PersistedExtensionConf
   };
 }
 
-function updateApiOriginPreview(controls: OptionsFormControls) {
-  const origin = normalizeApiBaseUrlToOrigin(controls.apiBaseUrl.value.trim());
-  controls.apiOriginPreview.textContent = origin ? `Requests will be sent to ${origin}` : "Enter a valid API URL.";
-}
-
 function applyProviderPreset(controls: OptionsFormControls) {
   if (controls.provider.value === GEMINI_PROVIDER) {
     if (!controls.apiBaseUrl.value.trim()) {
@@ -125,8 +115,6 @@ function applyProviderPreset(controls: OptionsFormControls) {
       controls.model.value = "gemini-3.1-flash-lite-preview";
     }
   }
-
-  updateApiOriginPreview(controls);
 }
 
 async function testApiConfiguration(
@@ -183,12 +171,7 @@ export async function mountOptionsPage(
   controls.model.value = savedConfig.model;
   controls.translateTitles.checked = savedConfig.translateTitles;
   controls.translateShortContentBlocks.checked = savedConfig.translateShortContentBlocks;
-  updateApiOriginPreview(controls);
   setStatus(controls.status, "Ready to save configuration.");
-
-  controls.apiBaseUrl.addEventListener("input", () => {
-    updateApiOriginPreview(controls);
-  });
 
   controls.provider.addEventListener("change", () => {
     applyProviderPreset(controls);
