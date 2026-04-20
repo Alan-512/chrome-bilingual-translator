@@ -26,7 +26,7 @@ describe("classifyPage", () => {
   });
 
   it("falls back to generic pages for non-Reddit sites", () => {
-    expect(classifyPage(createLocationDocument("https://openrouter.ai/models"))).toEqual({
+    expect(classifyPage(createLocationDocument("https://example.com/docs"))).toEqual({
       site: "generic",
       surface: "generic"
     });
@@ -43,6 +43,20 @@ describe("classifyPage", () => {
     expect(classifyPage(createLocationDocument("https://github.com/owner/repo/tree/main/src"))).toEqual({
       site: "github",
       surface: "repo-subpage"
+    });
+  });
+
+  it("classifies OpenRouter model listing pages", () => {
+    expect(classifyPage(createLocationDocument("https://openrouter.ai/models"))).toEqual({
+      site: "openrouter",
+      surface: "listing"
+    });
+  });
+
+  it("classifies Product Hunt product detail pages", () => {
+    expect(classifyPage(createLocationDocument("https://www.producthunt.com/products/build-check"))).toEqual({
+      site: "producthunt",
+      surface: "detail"
     });
   });
 });

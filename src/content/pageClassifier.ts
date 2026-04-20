@@ -1,6 +1,6 @@
 export type PageClassification = {
-  site: "reddit" | "github" | "generic";
-  surface: "listing" | "detail" | "repo-home" | "repo-subpage" | "generic";
+  site: "reddit" | "github" | "openrouter" | "producthunt" | "generic";
+  surface: "listing" | "detail" | "repo-home" | "repo-subpage" | "product-home" | "generic";
 };
 
 export function classifyPage(doc: Document): PageClassification {
@@ -43,6 +43,27 @@ export function classifyPage(doc: Document): PageClassification {
     return {
       site: "github",
       surface: "generic"
+    };
+  }
+
+  if (/(\.|^)openrouter\.ai$/i.test(host)) {
+    return {
+      site: "openrouter",
+      surface: "listing"
+    };
+  }
+
+  if (/(\.|^)producthunt\.com$/i.test(host)) {
+    if (/^\/products\/[^/]+/.test(pathname) || /^\/posts\/[^/]+/.test(pathname)) {
+      return {
+        site: "producthunt",
+        surface: "detail"
+      };
+    }
+
+    return {
+      site: "producthunt",
+      surface: "listing"
     };
   }
 
