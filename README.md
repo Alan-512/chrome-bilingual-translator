@@ -50,7 +50,7 @@ It works on normal article pages, feed-style pages, documentation pages, reposit
 4. Open `chrome://extensions`
 5. Turn on `Developer mode`
 6. Click `Load unpacked`
-7. Select the generated `release` folder
+7. Select the generated `release` folder instead of the project root
 
 After that, the extension is installed locally.
 
@@ -65,7 +65,7 @@ For small-scale sharing, the practical way is:
    npm run build
    ```
 
-2. Zip the generated `release` directory
+2. Zip the generated `release` directory only
 3. Send that folder to the other person
 4. They load it with `Load unpacked` in `chrome://extensions`
 
