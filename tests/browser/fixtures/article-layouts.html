@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Article Layout Fixture</title>
+    <style>
+      body {
+        background: #faf8f3;
+        color: #222;
+        font-family: Georgia, serif;
+        margin: 0;
+      }
+
+      .medium-like,
+      .substack-like {
+        width: 680px;
+        margin-left: 220px;
+        margin-right: 220px;
+      }
+
+      .medium-like {
+        font-size: 24px;
+        line-height: 1.55;
+      }
+
+      .substack-like {
+        font-size: 19px;
+        line-height: 1.65;
+      }
+
+      .docs-like {
+        max-width: 760px;
+        margin: 48px auto;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <h1 class="medium-like">How experimental teams build reliable products</h1>
+        <p id="medium-paragraph" class="medium-like">
+          Our models are evolving at a rapid clip, and each new release brings another leap in capabilities.
+        </p>
+        <p class="substack-like">
+          This approach has produced products that started as research previews and became dependable customer workflows.
+        </p>
+        <section class="docs-like">
+          <h2>Integration guide</h2>
+          <p>Install the extension once, configure an API provider, and translate pages while keeping the original text.</p>
+          <ul>
+            <li>Use a secure HTTPS API endpoint.</li>
+            <li>Reload the release directory after rebuilding.</li>
+          </ul>
+        </section>
+      </article>
+    </main>
+  </body>
+</html>

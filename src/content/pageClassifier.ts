@@ -37,7 +37,11 @@ function looksLikeGoogleSearchDocument(doc: Document): boolean {
     return false;
   }
 
-  return doc.querySelector(".MjjYud h3, .VwiC3b, .yXK7lf .MUxGbd") !== null;
+  return (
+    doc.querySelector(
+      ".MjjYud h3, .VwiC3b, .yXK7lf .MUxGbd, .related-question-pair [role='heading'], .kp-wholepage [data-attrid='title'], .kp-wholepage .kno-rdesc"
+    ) !== null
+  );
 }
 
 export function classifyPage(doc: Document): PageClassification {

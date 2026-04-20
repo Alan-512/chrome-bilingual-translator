@@ -28,7 +28,10 @@ const CONTENT_SELECTOR = [
   ".yXK7lf",
   ".MUxGbd",
   ".hgKElc",
-  ".s3v9rd"
+  ".s3v9rd",
+  ".related-question-pair [role='heading']",
+  ".kp-wholepage [data-attrid='title']",
+  ".kp-wholepage .kno-rdesc span"
 ].join(", ");
 const DISALLOWED_ANCESTORS = ["nav", "header", "footer", "aside", "button"];
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";

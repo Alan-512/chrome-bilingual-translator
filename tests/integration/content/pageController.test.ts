@@ -576,6 +576,38 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("limits each processing cycle to three batches on very long pages", async () => {
+    document.body.innerHTML = `
+      <main>
+        ${Array.from({ length: 90 }, (_, index) => `<p>Long page paragraph ${index + 1} with enough content to translate.</p>`).join("")}
+      </main>
+    `;
+
+    const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await controller.activate();
+
+    const requestedBlockCount = requestTranslations.mock.calls.reduce((count, call) => count + call[0].length, 0);
+    expect(requestTranslations).toHaveBeenCalledTimes(3);
+    expect(requestedBlockCount).toBe(72);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(72);
+
+    await controller.activate();
+
+    const totalRequestedBlockCount = requestTranslations.mock.calls.reduce((count, call) => count + call[0].length, 0);
+    expect(totalRequestedBlockCount).toBe(90);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(90);
+    await controller.deactivate();
+  });
+
   it("falls back to per-block retries when a batch request fails", async () => {
     const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) => {
       if (blocks.length > 1) {

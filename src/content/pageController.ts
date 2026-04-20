@@ -29,6 +29,7 @@ type PageControllerDependencies = {
 
 const TRANSLATION_BATCH_SIZE = 24;
 const MAX_CONCURRENT_BATCHES = 2;
+const MAX_CANDIDATES_PER_PROCESS_CYCLE = TRANSLATION_BATCH_SIZE * 3;
 
 type CandidateBlock = ReturnType<typeof collectCandidateBlocks>[number];
 type QueuedBatch = {
@@ -267,10 +268,12 @@ export function createPageController(doc: Document, dependencies: PageController
   }
 
   async function processCandidates(targetElements?: HTMLElement[]) {
-    const candidates = getEligibleCandidates(targetElements);
+    const eligibleCandidates = getEligibleCandidates(targetElements);
+    const candidates = eligibleCandidates.slice(0, MAX_CANDIDATES_PER_PROCESS_CYCLE);
     debugLog("candidates/collected", {
       requestedTargetCount: targetElements?.length ?? 0,
-      eligibleCount: candidates.length,
+      eligibleCount: eligibleCandidates.length,
+      selectedCount: candidates.length,
       blockIds: candidates.map((candidate) => candidate.blockId)
     });
 

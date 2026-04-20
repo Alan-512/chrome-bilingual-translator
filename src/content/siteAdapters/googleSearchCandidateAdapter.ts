@@ -1,9 +1,12 @@
 import type { CandidateBlock } from "../candidateDetector";
 import type { PageClassification } from "../pageClassifier";
 
-const GOOGLE_RESULT_ROOT_SELECTOR = ".MjjYud, .g, [data-snc]";
+const GOOGLE_RESULT_ROOT_SELECTOR = ".MjjYud, .g, [data-snc], .related-question-pair, .kp-wholepage";
 const GOOGLE_SNIPPET_SELECTOR = ".VwiC3b, .yXK7lf, .MUxGbd, .hgKElc, .s3v9rd";
 const GOOGLE_TITLE_ANCHOR_SELECTOR = ".yuRUbf, [data-header-feature], [data-snf]";
+const GOOGLE_QUESTION_SELECTOR = ".related-question-pair [role='heading']";
+const GOOGLE_KNOWLEDGE_TITLE_SELECTOR = ".kp-wholepage [data-attrid='title']";
+const GOOGLE_KNOWLEDGE_DESCRIPTION_SELECTOR = ".kp-wholepage .kno-rdesc span";
 
 type GoogleSearchAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
@@ -13,15 +16,51 @@ function normalizeText(text: string) {
   return text.replace(/\s+/g, " ").trim();
 }
 
-function getResultIndex(resultRoot: HTMLElement) {
+function getResultIndex(resultRoot: HTMLElement, selector = GOOGLE_RESULT_ROOT_SELECTOR) {
   const parent = resultRoot.parentElement;
   if (!parent) {
     return 0;
   }
 
-  const siblings = Array.from(parent.querySelectorAll<HTMLElement>(GOOGLE_RESULT_ROOT_SELECTOR));
+  const siblings = Array.from(parent.querySelectorAll<HTMLElement>(selector));
   const index = siblings.indexOf(resultRoot);
   return index >= 0 ? index : 0;
+}
+
+function getBlockKind(element: HTMLElement) {
+  if (element.tagName === "H3") {
+    return "title";
+  }
+
+  if (element.matches(GOOGLE_SNIPPET_SELECTOR)) {
+    return "snippet";
+  }
+
+  if (element.matches(GOOGLE_QUESTION_SELECTOR)) {
+    return "question";
+  }
+
+  if (element.matches(GOOGLE_KNOWLEDGE_TITLE_SELECTOR)) {
+    return "knowledge-title";
+  }
+
+  if (element.matches(GOOGLE_KNOWLEDGE_DESCRIPTION_SELECTOR)) {
+    return "knowledge-description";
+  }
+
+  return null;
+}
+
+function getKindIndex(resultRoot: HTMLElement, blockKind: string) {
+  if (blockKind === "question") {
+    return getResultIndex(resultRoot, ".related-question-pair");
+  }
+
+  if (blockKind === "knowledge-title" || blockKind === "knowledge-description") {
+    return getResultIndex(resultRoot, ".kp-wholepage");
+  }
+
+  return getResultIndex(resultRoot, ".MjjYud, .g, [data-snc]");
 }
 
 export function collectGoogleSearchCandidateBlock(
@@ -43,9 +82,9 @@ export function collectGoogleSearchCandidateBlock(
     return null;
   }
 
-  const resultIndex = getResultIndex(resultRoot);
-  const isTitleElement = element.tagName === "H3";
-  const isSnippetElement = element.matches(GOOGLE_SNIPPET_SELECTOR);
+  const blockKind = getBlockKind(element);
+  const isTitleElement = blockKind === "title";
+  const isSnippetElement = blockKind === "snippet";
   const nestedSnippetParent = isSnippetElement ? element.parentElement?.closest<HTMLElement>(GOOGLE_SNIPPET_SELECTOR) : null;
   const titleAnchorElement =
     isTitleElement && element.closest<HTMLElement>(GOOGLE_TITLE_ANCHOR_SELECTOR)?.closest<HTMLElement>(GOOGLE_RESULT_ROOT_SELECTOR) ===
@@ -53,7 +92,7 @@ export function collectGoogleSearchCandidateBlock(
       ? element.closest<HTMLElement>(GOOGLE_TITLE_ANCHOR_SELECTOR) ?? undefined
       : undefined;
 
-  if (!isTitleElement && !isSnippetElement) {
+  if (!blockKind) {
     return null;
   }
 
@@ -65,7 +104,7 @@ export function collectGoogleSearchCandidateBlock(
     blockId: helpers.getStableBlockId(element),
     element,
     sourceText,
-    rehydrateKey: `google-search|${page.surface}|${isTitleElement ? "title" : "snippet"}|${resultIndex}|${normalizeText(sourceText)}`,
+    rehydrateKey: `google-search|${page.surface}|${blockKind}|${getKindIndex(resultRoot, blockKind)}|${normalizeText(sourceText)}`,
     renderHint: {
       anchorElement: titleAnchorElement,
       expansionRoot: resultRoot

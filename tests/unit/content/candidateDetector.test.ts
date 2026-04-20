@@ -407,4 +407,53 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[0]?.renderHint?.anchorElement).toBe(firstTitleContainer);
     expect(blocks[1]?.renderHint?.anchorElement).toBeUndefined();
   });
+
+  it("extracts Google video, knowledge panel, and people-also-ask result text", () => {
+    document.body.innerHTML = `
+      <main>
+        <div class="MjjYud">
+          <div class="P94G9b">
+            <a href="/video">
+              <h3>Google Antigravity Tutorial for Beginners</h3>
+            </a>
+            <div class="VwiC3b">A beginner video walkthrough for building your first app.</div>
+          </div>
+        </div>
+        <div class="related-question-pair">
+          <div role="heading">What is Google Antigravity?</div>
+        </div>
+        <div class="kp-wholepage">
+          <div data-attrid="title">Google Antigravity</div>
+          <div class="kno-rdesc">
+            <span>Google Antigravity is an agentic development platform.</span>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const root = {
+      ownerDocument: {
+        ...document,
+        location: new URL("https://www.google.com/search?q=antigravity")
+      },
+      querySelectorAll: document.querySelectorAll.bind(document)
+    } as ParentNode;
+
+    const blocks = collectCandidateBlocks(root);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Google Antigravity Tutorial for Beginners",
+      "A beginner video walkthrough for building your first app.",
+      "What is Google Antigravity?",
+      "Google Antigravity",
+      "Google Antigravity is an agentic development platform."
+    ]);
+    expect(blocks.map((block) => block.rehydrateKey)).toEqual([
+      "google-search|listing|title|0|Google Antigravity Tutorial for Beginners",
+      "google-search|listing|snippet|0|A beginner video walkthrough for building your first app.",
+      "google-search|listing|question|0|What is Google Antigravity?",
+      "google-search|listing|knowledge-title|0|Google Antigravity",
+      "google-search|listing|knowledge-description|0|Google Antigravity is an agentic development platform."
+    ]);
+  });
 });

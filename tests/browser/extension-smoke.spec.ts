@@ -29,6 +29,8 @@ function startMockTranslationServer() {
   const requests: unknown[] = [];
   const fixtureRoutes = new Map<string, string>([
     ["/article", "article.html"],
+    ["/article-layouts", "article-layouts.html"],
+    ["/search?q=antigravity", "google-serp.html"],
     ["/r/vibecoding/", "reddit-listing.html"],
     ["/r/ChatGPT/comments/abc123/example-post/", "reddit-detail.html"],
     ["/owner/repo", "github-repo.html"],
@@ -210,6 +212,66 @@ test("translates a visible webpage block through the extension background flow",
     await expect(articlePage.locator("[data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
     await expect(articlePage.locator("[data-bilingual-translator-pill='true']")).toContainText("Translated");
     expect(mockServer.requests.length).toBeGreaterThan(0);
+  } finally {
+    await context.close();
+    await mockServer.close();
+  }
+});
+
+test("handles Google search result titles, snippets, videos, questions, and knowledge panels", async () => {
+  const mockServer = await startMockTranslationServer();
+  const userDataDir = test.info().outputPath("google-serp-user-data");
+  const { context, background } = await launchExtensionContext(userDataDir);
+
+  try {
+    await configureMockTranslator(background, `${mockServer.origin}/v1/chat/completions`);
+
+    const page = await context.newPage();
+    await page.goto(buildFixtureUrl(mockServer.port, "/search?q=antigravity"));
+    await page.bringToFront();
+    const [tab] = await background.evaluate(async () => chrome.tabs.query({ active: true, currentWindow: true }));
+
+    await injectAndActivate(background, tab.id);
+
+    await expect(page.locator(".yuRUbf + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+    await expect(page.locator(".VwiC3b + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+
+    await page.locator(".related-question-pair").scrollIntoViewIfNeeded();
+    await expect(page.locator(".related-question-pair [data-bilingual-translator-owned='true']").first()).toContainText(
+      "中文翻译"
+    );
+
+    await page.locator(".kp-wholepage").scrollIntoViewIfNeeded();
+    await expect(page.locator(".kp-wholepage [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+  } finally {
+    await context.close();
+    await mockServer.close();
+  }
+});
+
+test("keeps generic article translations aligned with centered reading columns", async () => {
+  const mockServer = await startMockTranslationServer();
+  const userDataDir = test.info().outputPath("article-layouts-user-data");
+  const { context, background } = await launchExtensionContext(userDataDir);
+
+  try {
+    await configureMockTranslator(background, `${mockServer.origin}/v1/chat/completions`);
+
+    const page = await context.newPage();
+    await page.goto(buildFixtureUrl(mockServer.port, "/article-layouts"));
+    await page.bringToFront();
+    const [tab] = await background.evaluate(async () => chrome.tabs.query({ active: true, currentWindow: true }));
+
+    await injectAndActivate(background, tab.id);
+
+    const mediumParagraph = page.locator("#medium-paragraph");
+    const mediumTranslation = page.locator("#medium-paragraph + [data-bilingual-translator-owned='true']");
+    await expect(mediumTranslation).toContainText("中文翻译");
+    await expect(mediumTranslation).toHaveCSS("width", await mediumParagraph.evaluate((node) => getComputedStyle(node).width));
+    await expect(mediumTranslation).toHaveCSS(
+      "margin-left",
+      await mediumParagraph.evaluate((node) => getComputedStyle(node).marginLeft)
+    );
   } finally {
     await context.close();
     await mockServer.close();
