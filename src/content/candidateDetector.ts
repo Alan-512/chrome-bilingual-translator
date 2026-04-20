@@ -57,11 +57,12 @@ function getStableBlockId(element: HTMLElement): string {
 
 export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
   const elements = Array.from(root.querySelectorAll<HTMLElement>(CONTENT_SELECTOR));
-  const candidates: CandidateBlock[] = [];
-  const groupedFeedCardIds = new Set<string>();
   const doc = root instanceof Document ? root : root.ownerDocument;
   const page = classifyPage(doc);
-  const useGenericFallback = allowGenericFallbackForPage(page);
+  const siteCandidates: CandidateBlock[] = [];
+  const genericCandidates: CandidateBlock[] = [];
+  const groupedFeedCardIds = new Set<string>();
+  let matchedSiteCandidate = false;
 
   elements.forEach((element) => {
     if (isExtensionOwned(element) || isHidden(element)) {
@@ -80,16 +81,13 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
         return;
       }
 
+      matchedSiteCandidate = true;
       groupedFeedCardIds.add(groupedFeedCard.blockId);
-      candidates.push(groupedFeedCard);
+      siteCandidates.push(groupedFeedCard);
       return;
     }
 
     if (isInsideDisallowedAncestor(element) || isRedundantSlotContainer(element)) {
-      return;
-    }
-
-    if (!useGenericFallback) {
       return;
     }
 
@@ -102,12 +100,16 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
       return;
     }
 
-    candidates.push({
+    genericCandidates.push({
       blockId: getStableBlockId(element),
       element,
       sourceText
     });
   });
 
-  return candidates;
+  if (matchedSiteCandidate) {
+    return siteCandidates;
+  }
+
+  return genericCandidates;
 }

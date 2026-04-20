@@ -211,6 +211,32 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[2]?.renderHint?.expansionRoot).toBe(about);
   });
 
+  it("falls back to generic detection when a GitHub page has no adapter-specific candidates", () => {
+    document.body.innerHTML = `
+      <main>
+        <article>
+          <h2>Fincept-Corporation / FinceptTerminal</h2>
+          <p>FinceptTerminal is a modern finance application offering advanced market analytics.</p>
+        </article>
+      </main>
+    `;
+    const root = {
+      ownerDocument: {
+        ...document,
+        location: new URL("https://github.com/trending")
+      },
+      querySelectorAll: document.querySelectorAll.bind(document)
+    } as ParentNode;
+
+    const blocks = collectCandidateBlocks(root);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Fincept-Corporation / FinceptTerminal",
+      "FinceptTerminal is a modern finance application offering advanced market analytics."
+    ]);
+    expect(blocks.every((block) => block.renderHint == null)).toBe(true);
+  });
+
   it("limits OpenRouter candidates to model card content", () => {
     document.body.innerHTML = `
       <main>
@@ -255,6 +281,37 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[0]?.renderHint?.anchorElement).toBe(firstModelSummary);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(firstModelCard);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(firstModelCard);
+  });
+
+  it("falls back to generic detection when an OpenRouter models page uses unknown card markup", () => {
+    document.body.innerHTML = `
+      <main>
+        <aside>
+          <p>Input Modalities</p>
+        </aside>
+        <section>
+          <article>
+            <h2>OpenAI: GPT-4o Mini TTS</h2>
+            <p>GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.</p>
+          </article>
+        </section>
+      </main>
+    `;
+    const root = {
+      ownerDocument: {
+        ...document,
+        location: new URL("https://openrouter.ai/models")
+      },
+      querySelectorAll: document.querySelectorAll.bind(document)
+    } as ParentNode;
+
+    const blocks = collectCandidateBlocks(root);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "OpenAI: GPT-4o Mini TTS",
+      "GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model."
+    ]);
+    expect(blocks.every((block) => block.renderHint == null)).toBe(true);
   });
 
   it("limits Product Hunt candidates to the main product content area", () => {
