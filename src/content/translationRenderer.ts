@@ -193,6 +193,8 @@ function getOrCreateTranslationElement(
   translationElement.setAttribute("lang", TRANSLATION_LANGUAGE);
   translationElement.setAttribute("dir", "ltr");
   translationElement.className = "bilingual-translator-translation";
+  translationElement.style.direction = "ltr";
+  translationElement.style.unicodeBidi = "plaintext";
   anchorElement.insertAdjacentElement("afterend", translationElement);
   return translationElement;
 }

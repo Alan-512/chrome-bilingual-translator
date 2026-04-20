@@ -91,6 +91,8 @@ describe("renderTranslationBelow", () => {
     const translation = source.nextElementSibling as HTMLElement;
     expect(translation.getAttribute("lang")).toBe("zh-CN");
     expect(translation.getAttribute("dir")).toBe("ltr");
+    expect(translation.style.direction).toBe("ltr");
+    expect(translation.style.unicodeBidi).toBe("plaintext");
   });
 
   it("re-attaches the translated result when the source node was replaced during rendering", () => {
