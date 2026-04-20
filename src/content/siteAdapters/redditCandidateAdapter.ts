@@ -33,10 +33,6 @@ export function collectRedditCandidateBlock(
   page: PageClassification,
   helpers: RedditAdapterHelpers
 ): CandidateBlock | null {
-  if (page.surface !== "listing") {
-    return null;
-  }
-
   const feedCard = element.closest<HTMLElement>(REDDIT_FEED_CARD_SELECTOR);
   if (!feedCard) {
     return null;
@@ -44,16 +40,57 @@ export function collectRedditCandidateBlock(
 
   const titleElement = feedCard.querySelector<HTMLElement>("[slot='title']");
   const bodyElement = feedCard.querySelector<HTMLElement>("[slot='text-body']");
-  const sourceParts = [getNormalizedText(titleElement), getNormalizedGroupedText(bodyElement)].filter(Boolean);
-  const anchorElement = bodyElement ?? titleElement;
 
-  if (!anchorElement || sourceParts.length === 0) {
+  if (page.surface === "listing") {
+    const sourceParts = [getNormalizedText(titleElement), getNormalizedGroupedText(bodyElement)].filter(Boolean);
+    const anchorElement = bodyElement ?? titleElement;
+
+    if (!anchorElement || sourceParts.length === 0) {
+      return null;
+    }
+
+    return {
+      blockId: helpers.getStableBlockId(anchorElement),
+      element: anchorElement,
+      sourceText: sourceParts.join("\n\n"),
+      renderHint: {
+        anchorElement,
+        expansionRoot: feedCard
+      }
+    };
+  }
+
+  if (page.surface !== "detail") {
     return null;
   }
 
-  return {
-    blockId: helpers.getStableBlockId(anchorElement),
-    element: anchorElement,
-    sourceText: sourceParts.join("\n\n")
-  };
+  const sourceText = getNormalizedText(element);
+  if (!sourceText) {
+    return null;
+  }
+
+  if (element === titleElement) {
+    return {
+      blockId: helpers.getStableBlockId(element),
+      element,
+      sourceText,
+      renderHint: {
+        anchorElement: bodyElement?.querySelector<HTMLElement>("p, li, blockquote") ?? undefined,
+        expansionRoot: feedCard
+      }
+    };
+  }
+
+  if (bodyElement && element !== bodyElement && bodyElement.contains(element)) {
+    return {
+      blockId: helpers.getStableBlockId(element),
+      element,
+      sourceText,
+      renderHint: {
+        expansionRoot: feedCard
+      }
+    };
+  }
+
+  return null;
 }

@@ -78,12 +78,16 @@ describe("collectCandidateBlocks", () => {
     `;
 
     const blocks = collectCandidateBlocks(document);
+    const feedCard = document.querySelector("shreddit-post") as HTMLElement;
+    const feedBody = feedCard.querySelector("[slot='text-body']") as HTMLElement;
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0]?.element.getAttribute("slot")).toBe("text-body");
     expect(blocks[0]?.sourceText).toBe(
       "A Reddit feed title that should be translated\n\nA feed preview paragraph that is shown on the homepage card."
     );
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(feedBody);
+    expect(blocks[0]?.renderHint?.expansionRoot).toBe(feedCard);
   });
 
   it("groups Reddit text-body containers with semantic children into a single card block", () => {
@@ -124,6 +128,8 @@ describe("collectCandidateBlocks", () => {
     `;
 
     const blocks = collectCandidateBlocks(document);
+    const postCard = document.querySelector("shreddit-post") as HTMLElement;
+    const firstParagraph = postCard.querySelector("p") as HTMLParagraphElement;
 
     expect(blocks.map((block) => ({ slot: block.element.getAttribute("slot"), text: block.sourceText }))).toEqual([
       {
@@ -139,6 +145,9 @@ describe("collectCandidateBlocks", () => {
         text: "Chatgpt renders every single message in your browser at once."
       }
     ]);
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstParagraph);
+    expect(blocks[0]?.renderHint?.expansionRoot).toBe(postCard);
+    expect(blocks[1]?.renderHint?.expansionRoot).toBe(postCard);
   });
 
   it("limits GitHub repository home candidates to README and about content", () => {
