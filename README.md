@@ -14,21 +14,11 @@ It keeps the original text on the page and inserts Simplified Chinese translatio
   - `OpenAI Compatible`
   - `Google Gemini`
 
-## Current Site Adaptation
+## Webpage Coverage
 
-The extension has explicit page adapters for these site types:
+The extension is designed as a general webpage translation tool.
 
-- Reddit
-  - listing pages
-  - post detail pages
-- GitHub
-  - repository README / about areas
-- OpenRouter
-  - model card pages
-- Product Hunt
-  - product detail pages
-
-Other sites still work through the generic content detector, but the sites above have more stable layout handling.
+It works on normal article pages, feed-style pages, documentation pages, repository pages, and many dynamic websites. Internally it combines generic content detection with extra layout handling for more complex pages, but the product itself is meant to be used as a general-purpose webpage translator rather than a site-specific tool.
 
 ## Install For Yourself
 
@@ -194,7 +184,7 @@ If you share the extension with others, they should normally use:
 
 ### Why are some sites more stable than others?
 
-Modern sites often rerender content aggressively. This extension already has explicit handling for several high-frequency sites, but fully generic DOM translation is never as stable as site-specific adaptation.
+Modern sites often rerender content aggressively, virtualize long lists, or clamp content with custom layout rules. The extension is built to work broadly across normal webpages and many dynamic pages, but extremely custom frontends can still behave differently from simpler document-style pages.
 
 ## Development Commands
 
@@ -227,7 +217,7 @@ npm run test:browser
 This project is currently at a usable self-hosted MVP stage:
 
 - main functionality is complete
-- site-adapter architecture is in place
-- browser regression coverage exists for the primary adapted sites
+- generic webpage translation architecture is in place
+- browser regression coverage exists for key dynamic page patterns
 
 It is usable now, but still open to further polish and broader site coverage.
