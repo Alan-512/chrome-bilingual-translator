@@ -28,6 +28,10 @@ function getNormalizedGroupedText(element: HTMLElement | null): string {
   return getNormalizedText(element);
 }
 
+function buildRedditRehydrateKey(page: PageClassification, parts: string[]) {
+  return ["reddit", page.surface, ...parts.map((part) => part.replace(/\s+/g, " ").trim()).filter(Boolean)].join("|");
+}
+
 export function collectRedditCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
@@ -53,6 +57,7 @@ export function collectRedditCandidateBlock(
       blockId: helpers.getStableBlockId(anchorElement),
       element: anchorElement,
       sourceText: sourceParts.join("\n\n"),
+      rehydrateKey: buildRedditRehydrateKey(page, sourceParts),
       renderHint: {
         anchorElement,
         expansionRoot: feedCard
@@ -74,6 +79,7 @@ export function collectRedditCandidateBlock(
       blockId: helpers.getStableBlockId(element),
       element,
       sourceText,
+      rehydrateKey: buildRedditRehydrateKey(page, [sourceText]),
       renderHint: {
         anchorElement: bodyElement?.querySelector<HTMLElement>("p, li, blockquote") ?? undefined,
         expansionRoot: feedCard
@@ -86,6 +92,7 @@ export function collectRedditCandidateBlock(
       blockId: helpers.getStableBlockId(element),
       element,
       sourceText,
+      rehydrateKey: buildRedditRehydrateKey(page, [sourceText]),
       renderHint: {
         expansionRoot: feedCard
       }

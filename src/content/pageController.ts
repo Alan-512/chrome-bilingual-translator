@@ -45,6 +45,10 @@ function getCandidateSignature(candidate: { element: HTMLElement; sourceText: st
   return `${candidate.element.tagName}|${slotName}|${normalizeSourceText(candidate.sourceText)}`;
 }
 
+function getCandidateMemoryKey(candidate: { element: HTMLElement; sourceText: string; rehydrateKey?: string }) {
+  return candidate.rehydrateKey ?? getCandidateSignature(candidate);
+}
+
 async function safeReportPageState(
   dependencies: PageControllerDependencies,
   state: {
@@ -213,10 +217,10 @@ export function createPageController(doc: Document, dependencies: PageController
         stateStore.set(candidate.blockId, "failed");
         removeRenderedTranslationBlock(doc, candidate.blockId);
         failedBlockIds.add(candidate.blockId);
-        inFlightSignatures.delete(getCandidateSignature(candidate));
+        inFlightSignatures.delete(getCandidateMemoryKey(candidate));
         debugLog("block/failed", {
           blockId: candidate.blockId,
-          signature: getCandidateSignature(candidate),
+          signature: getCandidateMemoryKey(candidate),
           sourceText: candidate.sourceText
         });
         continue;
@@ -229,14 +233,14 @@ export function createPageController(doc: Document, dependencies: PageController
         anchorElement: candidate.renderHint?.anchorElement,
         expansionRoot: candidate.renderHint?.expansionRoot
       });
-      translationMemory.set(getCandidateSignature(candidate), translationText);
-      inFlightSignatures.delete(getCandidateSignature(candidate));
+      translationMemory.set(getCandidateMemoryKey(candidate), translationText);
+      inFlightSignatures.delete(getCandidateMemoryKey(candidate));
       failedBlockIds.delete(candidate.blockId);
       stateStore.set(candidate.blockId, "translated");
       translatedBlockCount += 1;
       debugLog("block/translated", {
         blockId: candidate.blockId,
-        signature: getCandidateSignature(candidate),
+        signature: getCandidateMemoryKey(candidate),
         sourceText: candidate.sourceText,
         translationText
       });
@@ -278,22 +282,22 @@ export function createPageController(doc: Document, dependencies: PageController
     const candidatesNeedingRequests: CandidateBlock[] = [];
 
     for (const candidate of candidates) {
-      const cachedTranslation = translationMemory.get(getCandidateSignature(candidate));
+      const cachedTranslation = translationMemory.get(getCandidateMemoryKey(candidate));
       if (!cachedTranslation) {
-        if (inFlightSignatures.has(getCandidateSignature(candidate))) {
+        if (inFlightSignatures.has(getCandidateMemoryKey(candidate))) {
           debugLog("candidate/skipped-inflight-duplicate", {
             blockId: candidate.blockId,
-            signature: getCandidateSignature(candidate),
+            signature: getCandidateMemoryKey(candidate),
             sourceText: candidate.sourceText
           });
           continue;
         }
 
-        inFlightSignatures.add(getCandidateSignature(candidate));
+        inFlightSignatures.add(getCandidateMemoryKey(candidate));
         candidatesNeedingRequests.push(candidate);
         debugLog("candidate/queued", {
           blockId: candidate.blockId,
-          signature: getCandidateSignature(candidate),
+          signature: getCandidateMemoryKey(candidate),
           sourceText: candidate.sourceText
         });
         continue;
@@ -309,7 +313,7 @@ export function createPageController(doc: Document, dependencies: PageController
       stateStore.set(candidate.blockId, "translated");
       debugLog("candidate/rehydrated-from-memory", {
         blockId: candidate.blockId,
-        signature: getCandidateSignature(candidate),
+        signature: getCandidateMemoryKey(candidate),
         sourceText: candidate.sourceText
       });
     }

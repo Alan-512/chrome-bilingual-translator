@@ -11,6 +11,10 @@ type OpenRouterAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
 };
 
+function normalizeText(text: string) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
 export function collectOpenRouterCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
@@ -37,6 +41,7 @@ export function collectOpenRouterCandidateBlock(
     blockId: helpers.getStableBlockId(element),
     element,
     sourceText,
+    rehydrateKey: `openrouter|${page.surface}|${normalizeText(sourceText)}`,
     renderHint: {
       anchorElement: isTitleElement ? summaryElement ?? undefined : undefined,
       expansionRoot: allowedRoot

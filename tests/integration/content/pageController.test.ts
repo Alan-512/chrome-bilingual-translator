@@ -307,6 +307,60 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("re-hydrates adapter-backed content after rerender even when the DOM tag changes", async () => {
+    let mutationCallback: (() => void) | undefined;
+    const requestTranslations = vi.fn(async (blocks) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    window.history.replaceState({}, "", "/github-repo");
+    document.body.innerHTML = `
+      <main>
+        <section id="readme">
+          <article class="markdown-body">
+            <h1>Claude Code Game Studios</h1>
+            <p>Turn a single Claude Code session into a full game development studio.</p>
+          </article>
+        </section>
+      </main>
+    `;
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          mutationCallback = callbacks.onMutation;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    await controller.activate();
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+
+    document.body.innerHTML = `
+      <main>
+        <section id="readme">
+          <article class="markdown-body">
+            <h2>Claude Code Game Studios</h2>
+            <p>Turn a single Claude Code session into a full game development studio.</p>
+          </article>
+        </section>
+      </main>
+    `;
+
+    mutationCallback?.();
+    await settlePromises();
+
+    const translatedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(translatedBlocks).toHaveLength(2);
+    expect(translatedBlocks.every((node) => node.textContent?.includes("ZH:"))).toBe(true);
+    await controller.deactivate();
+  });
+
   it("does not queue the same visible content twice while its first request is still pending", async () => {
     let mutationCallback: (() => void) | undefined;
     let resolveTranslations: ((value: Record<string, string>) => void) | undefined;

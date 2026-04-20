@@ -86,6 +86,9 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[0]?.sourceText).toBe(
       "A Reddit feed title that should be translated\n\nA feed preview paragraph that is shown on the homepage card."
     );
+    expect(blocks[0]?.rehydrateKey).toBe(
+      "reddit|listing|A Reddit feed title that should be translated|A feed preview paragraph that is shown on the homepage card."
+    );
     expect(blocks[0]?.renderHint?.anchorElement).toBe(feedBody);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(feedCard);
   });
@@ -188,6 +191,11 @@ describe("collectCandidateBlocks", () => {
       "Turn a single Claude Code session into a full game development studio.",
       "Turn Claude Code into a full game dev studio."
     ]);
+    expect(blocks[0]?.rehydrateKey).toBe("github|repo-home|readme|Claude Code Game Studios");
+    expect(blocks[1]?.rehydrateKey).toBe(
+      "github|repo-home|readme|Turn a single Claude Code session into a full game development studio."
+    );
+    expect(blocks[2]?.rehydrateKey).toBe("github|repo-home|about|Turn Claude Code into a full game dev studio.");
     expect(blocks[0]?.renderHint?.anchorElement).toBe(firstReadmeParagraph);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(readme);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(readme);
@@ -233,6 +241,8 @@ describe("collectCandidateBlocks", () => {
       "Google: Gemini Embedding 2 Preview",
       "Gemini Embedding 2 Preview is Google's first multimodal embedding model."
     ]);
+    expect(blocks[0]?.rehydrateKey).toBe("openrouter|listing|OpenAI: GPT-4o Mini TTS");
+    expect(blocks[1]?.rehydrateKey).toBe("openrouter|listing|GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.");
     expect(blocks[0]?.renderHint?.anchorElement).toBe(firstModelSummary);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(firstModelCard);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(firstModelCard);
@@ -273,6 +283,8 @@ describe("collectCandidateBlocks", () => {
       "Is your app idea actually worth building?",
       "A free quiz for outsiders and vibe coders."
     ]);
+    expect(blocks[0]?.rehydrateKey).toBe("producthunt|detail|main|Build Check (for Outsiders)");
+    expect(blocks[1]?.rehydrateKey).toBe("producthunt|detail|main|Is your app idea actually worth building?");
     expect(blocks[0]?.renderHint?.anchorElement).toBe(firstSummaryParagraph);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(productMain);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(productMain);

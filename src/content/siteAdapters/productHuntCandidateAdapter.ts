@@ -12,6 +12,10 @@ type ProductHuntAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
 };
 
+function normalizeText(text: string) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
 export function collectProductHuntCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
@@ -38,6 +42,7 @@ export function collectProductHuntCandidateBlock(
     blockId: helpers.getStableBlockId(element),
     element,
     sourceText,
+    rehydrateKey: `producthunt|${page.surface}|main|${normalizeText(sourceText)}`,
     renderHint: {
       anchorElement: firstSummaryParagraph,
       expansionRoot: allowedRoot

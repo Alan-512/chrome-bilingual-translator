@@ -18,6 +18,22 @@ type GitHubAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
 };
 
+function normalizeText(text: string) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function getGitHubArea(expansionRoot: HTMLElement) {
+  if (expansionRoot.matches("#readme")) {
+    return "readme";
+  }
+
+  if (expansionRoot.matches("[itemprop='about'], [data-testid='repository-about']")) {
+    return "about";
+  }
+
+  return "content";
+}
+
 export function collectGitHubCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
@@ -46,6 +62,7 @@ export function collectGitHubCandidateBlock(
     blockId: helpers.getStableBlockId(element),
     element,
     sourceText,
+    rehydrateKey: `github|${page.surface}|${getGitHubArea(expansionRoot)}|${normalizeText(sourceText)}`,
     renderHint: {
       anchorElement: isTitleElement ? summaryElement ?? undefined : undefined,
       expansionRoot
