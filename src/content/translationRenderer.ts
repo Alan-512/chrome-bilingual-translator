@@ -23,6 +23,36 @@ const FALLBACK_SOURCE_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [sl
 const EXPANDED_ATTRIBUTE = "data-bilingual-translator-expanded";
 const SEMANTIC_BLOCK_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
 const TRANSLATION_LANGUAGE = "zh-CN";
+const INLINE_TAG_NAMES = new Set([
+  "a",
+  "abbr",
+  "b",
+  "cite",
+  "code",
+  "em",
+  "i",
+  "label",
+  "small",
+  "span",
+  "strong",
+  "sub",
+  "sup"
+]);
+const BLOCKISH_TAG_NAMES = new Set([
+  "article",
+  "aside",
+  "blockquote",
+  "div",
+  "figcaption",
+  "figure",
+  "footer",
+  "header",
+  "li",
+  "main",
+  "nav",
+  "p",
+  "section"
+]);
 
 function ensureTranslationStyles(doc: Document): void {
   if (doc.head?.querySelector(`[${STYLE_ATTRIBUTE}='true']`)) {
@@ -45,7 +75,7 @@ function ensureTranslationStyles(doc: Document): void {
 
     .bilingual-translator-translation[data-bilingual-translator-state="translated"] {
       color: inherit;
-      display: inline-block;
+      display: block;
       width: fit-content;
       max-width: 100%;
       border-bottom: 2px dashed color-mix(in srgb, currentColor 64%, transparent);
@@ -53,9 +83,11 @@ function ensureTranslationStyles(doc: Document): void {
     }
 
     .bilingual-translator-translation[data-bilingual-translator-state="loading"] {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 8px;
+      width: fit-content;
+      max-width: 100%;
       color: inherit;
       opacity: 0.82;
     }
@@ -83,20 +115,62 @@ function getComputedDisplay(element: HTMLElement): string {
   return element.ownerDocument.defaultView?.getComputedStyle(element).display ?? "";
 }
 
+function isInlineLikeElement(element: HTMLElement): boolean {
+  const elementDisplay = getComputedDisplay(element);
+  return (
+    element.matches("[slot='title']") ||
+    INLINE_TAG_NAMES.has(element.tagName.toLowerCase()) ||
+    elementDisplay.startsWith("inline") ||
+    elementDisplay === "contents" ||
+    elementDisplay === ""
+  );
+}
+
+function findNearestBlockContainer(element: HTMLElement): HTMLElement | null {
+  let current: HTMLElement | null = element.parentElement;
+
+  while (current) {
+    const display = getComputedDisplay(current);
+    const isBlockishDisplay =
+      display === "block" ||
+      display === "flex" ||
+      display === "grid" ||
+      display === "flow-root" ||
+      display === "list-item" ||
+      display === "table";
+
+    if (isBlockishDisplay || BLOCKISH_TAG_NAMES.has(current.tagName.toLowerCase())) {
+      return current;
+    }
+
+    current = current.parentElement;
+  }
+
+  return null;
+}
+
+function resolveSourceTranslationAnchor(element: HTMLElement): HTMLElement {
+  if (!isInlineLikeElement(element)) {
+    return element;
+  }
+
+  return element.closest<HTMLElement>(SEMANTIC_BLOCK_SELECTOR) ?? element;
+}
+
+function resolveExplicitTranslationAnchor(element: HTMLElement): HTMLElement {
+  if (!isInlineLikeElement(element)) {
+    return element;
+  }
+
+  return element.closest<HTMLElement>(SEMANTIC_BLOCK_SELECTOR) ?? findNearestBlockContainer(element) ?? element;
+}
+
 function getTranslationAnchorElement(sourceElement: HTMLElement, explicitAnchorElement?: HTMLElement): HTMLElement {
   if (explicitAnchorElement) {
-    return explicitAnchorElement;
+    return resolveExplicitTranslationAnchor(explicitAnchorElement);
   }
 
-  const sourceDisplay = getComputedDisplay(sourceElement);
-  const isInlineLikeSource =
-    sourceElement.matches("[slot='title']") || sourceDisplay.startsWith("inline") || sourceDisplay === "contents";
-
-  if (!isInlineLikeSource) {
-    return sourceElement;
-  }
-
-  return sourceElement.closest<HTMLElement>(SEMANTIC_BLOCK_SELECTOR) ?? sourceElement;
+  return resolveSourceTranslationAnchor(sourceElement);
 }
 
 function getOrCreateTranslationElement(

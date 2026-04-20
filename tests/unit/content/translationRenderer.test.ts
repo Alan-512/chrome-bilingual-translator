@@ -169,6 +169,34 @@ describe("renderTranslationBelow", () => {
     expect((summary.nextElementSibling as HTMLElement).textContent).toBe("OpenAI：GPT-4o Mini TTS");
   });
 
+  it("normalizes explicit inline anchors to the nearest semantic block on search-result layouts", () => {
+    document.body.innerHTML = `
+      <main>
+        <article id="result">
+          <div id="meta-row">
+            <span id="site-name">Chrome Web Store</span>
+            <span id="inline-anchor">翻译此页</span>
+          </div>
+          <h3 id="title">SteamDB - Chrome Web Store</h3>
+          <p id="snippet">Adds SteamDB links and new features on the Steam store and community.</p>
+        </article>
+      </main>
+    `;
+    const title = document.getElementById("title") as HTMLHeadingElement;
+    const inlineAnchor = document.getElementById("inline-anchor") as HTMLSpanElement;
+    const metaRow = document.getElementById("meta-row") as HTMLDivElement;
+
+    renderTranslationBelow(title, {
+      blockId: "alpha",
+      translationText: "SteamDB - Chrome 网上应用店",
+      anchorElement: inlineAnchor
+    });
+
+    expect(metaRow.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
+    expect(metaRow.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
+    expect((metaRow.nextElementSibling as HTMLElement).textContent).toBe("SteamDB - Chrome 网上应用店");
+  });
+
   it("relaxes clipped card containers so the translated text can fully expand", () => {
     document.body.innerHTML = `
       <main>
