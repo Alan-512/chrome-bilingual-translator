@@ -362,7 +362,11 @@ describe("collectCandidateBlocks", () => {
         <div class="MjjYud">
           <div class="VuuXrf">Chrome Web Store</div>
           <p>steamdb - chrome web store</p>
-          <h3>SteamDB - Chrome Web Store</h3>
+          <div class="yuRUbf">
+            <a href="/result">
+              <h3>SteamDB - Chrome Web Store</h3>
+            </a>
+          </div>
           <div class="VwiC3b">Adds SteamDB links and new features on the Steam store and community.</div>
         </div>
         <div class="MjjYud">
@@ -386,7 +390,7 @@ describe("collectCandidateBlocks", () => {
 
     const blocks = collectCandidateBlocks(root);
     const firstResult = document.querySelector(".MjjYud") as HTMLElement;
-    const firstSnippet = firstResult.querySelector(".VwiC3b") as HTMLElement;
+    const firstTitleContainer = firstResult.querySelector(".yuRUbf") as HTMLElement;
 
     expect(blocks.map((block) => block.sourceText)).toEqual([
       "SteamDB - Chrome Web Store",
@@ -400,7 +404,7 @@ describe("collectCandidateBlocks", () => {
     );
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(firstResult);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(firstResult);
-    expect(blocks[0]?.renderHint?.anchorElement).toBeUndefined();
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstTitleContainer);
     expect(blocks[1]?.renderHint?.anchorElement).toBeUndefined();
   });
 });

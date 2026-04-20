@@ -3,6 +3,7 @@ import type { PageClassification } from "../pageClassifier";
 
 const GOOGLE_RESULT_ROOT_SELECTOR = ".MjjYud, .g, [data-snc]";
 const GOOGLE_SNIPPET_SELECTOR = ".VwiC3b, .yXK7lf, .MUxGbd, .hgKElc, .s3v9rd";
+const GOOGLE_TITLE_ANCHOR_SELECTOR = ".yuRUbf, [data-header-feature], [data-snf]";
 
 type GoogleSearchAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
@@ -46,6 +47,11 @@ export function collectGoogleSearchCandidateBlock(
   const isTitleElement = element.tagName === "H3";
   const isSnippetElement = element.matches(GOOGLE_SNIPPET_SELECTOR);
   const nestedSnippetParent = isSnippetElement ? element.parentElement?.closest<HTMLElement>(GOOGLE_SNIPPET_SELECTOR) : null;
+  const titleAnchorElement =
+    isTitleElement && element.closest<HTMLElement>(GOOGLE_TITLE_ANCHOR_SELECTOR)?.closest<HTMLElement>(GOOGLE_RESULT_ROOT_SELECTOR) ===
+      resultRoot
+      ? element.closest<HTMLElement>(GOOGLE_TITLE_ANCHOR_SELECTOR) ?? undefined
+      : undefined;
 
   if (!isTitleElement && !isSnippetElement) {
     return null;
@@ -61,6 +67,7 @@ export function collectGoogleSearchCandidateBlock(
     sourceText,
     rehydrateKey: `google-search|${page.surface}|${isTitleElement ? "title" : "snippet"}|${resultIndex}|${normalizeText(sourceText)}`,
     renderHint: {
+      anchorElement: titleAnchorElement,
       expansionRoot: resultRoot
     }
   };
