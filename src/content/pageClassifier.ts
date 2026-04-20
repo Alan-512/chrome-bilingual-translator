@@ -1,5 +1,5 @@
 export type PageClassification = {
-  site: "reddit" | "github" | "openrouter" | "producthunt" | "generic";
+  site: "reddit" | "github" | "openrouter" | "producthunt" | "google-search" | "generic";
   surface: "listing" | "detail" | "repo-home" | "repo-subpage" | "product-home" | "generic";
 };
 
@@ -30,6 +30,14 @@ function looksLikeProductHuntDocument(doc: Document): boolean {
     doc.querySelector("[data-producthunt-main], main article, [data-test='product-main'], [data-sentry-component='ProductPage']") !==
     null
   );
+}
+
+function looksLikeGoogleSearchDocument(doc: Document): boolean {
+  if (typeof doc.querySelector !== "function") {
+    return false;
+  }
+
+  return doc.querySelector(".MjjYud h3, .VwiC3b, .yXK7lf .MUxGbd") !== null;
 }
 
 export function classifyPage(doc: Document): PageClassification {
@@ -93,6 +101,13 @@ export function classifyPage(doc: Document): PageClassification {
     return {
       site: "producthunt",
       surface: looksLikeProductHuntDocument(doc) ? "detail" : "listing"
+    };
+  }
+
+  if ((/(\.|^)google\./i.test(host) && pathname === "/search") || looksLikeGoogleSearchDocument(doc)) {
+    return {
+      site: "google-search",
+      surface: "listing"
     };
   }
 

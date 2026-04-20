@@ -1,5 +1,6 @@
 import type { CandidateBlock } from "../candidateDetector";
 import type { PageClassification } from "../pageClassifier";
+import { collectGoogleSearchCandidateBlock } from "./googleSearchCandidateAdapter";
 import { collectGitHubCandidateBlock } from "./githubCandidateAdapter";
 import { collectOpenRouterCandidateBlock } from "./openRouterCandidateAdapter";
 import { collectProductHuntCandidateBlock } from "./productHuntCandidateAdapter";
@@ -28,6 +29,11 @@ const GITHUB_ADAPTER: SiteAdapter = {
   collectCandidateBlock: collectGitHubCandidateBlock
 };
 
+const GOOGLE_SEARCH_ADAPTER: SiteAdapter = {
+  allowGenericFallback: () => false,
+  collectCandidateBlock: collectGoogleSearchCandidateBlock
+};
+
 const OPENROUTER_ADAPTER: SiteAdapter = {
   allowGenericFallback: () => false,
   collectCandidateBlock: collectOpenRouterCandidateBlock
@@ -45,6 +51,10 @@ function getSiteAdapter(page: PageClassification): SiteAdapter | null {
 
   if (page.site === "github") {
     return GITHUB_ADAPTER;
+  }
+
+  if (page.site === "google-search") {
+    return GOOGLE_SEARCH_ADAPTER;
   }
 
   if (page.site === "openrouter") {

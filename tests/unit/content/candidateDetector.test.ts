@@ -355,4 +355,51 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(productMain);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(productMain);
   });
+
+  it("limits Google search result candidates to titles and snippets", () => {
+    document.body.innerHTML = `
+      <main>
+        <div class="MjjYud">
+          <div class="VuuXrf">Chrome Web Store</div>
+          <p>steamdb - chrome web store</p>
+          <h3>SteamDB - Chrome Web Store</h3>
+          <div class="VwiC3b">Adds SteamDB links and new features on the Steam store and community.</div>
+        </div>
+        <div class="MjjYud">
+          <div class="VuuXrf">steamdb.com</div>
+          <p>steam dashboard - steam news tools analytics</p>
+          <h3>Steam DashBoard — News, Tools & Analytics for Steam</h3>
+          <div class="yXK7lf">
+            <span class="MUxGbd">Steam DashBoard is a comprehensive platform for everything Steam-related.</span>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const root = {
+      ownerDocument: {
+        ...document,
+        location: new URL("https://www.google.com/search?q=steamdb")
+      },
+      querySelectorAll: document.querySelectorAll.bind(document)
+    } as ParentNode;
+
+    const blocks = collectCandidateBlocks(root);
+    const firstResult = document.querySelector(".MjjYud") as HTMLElement;
+    const firstSnippet = firstResult.querySelector(".VwiC3b") as HTMLElement;
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "SteamDB - Chrome Web Store",
+      "Adds SteamDB links and new features on the Steam store and community.",
+      "Steam DashBoard — News, Tools & Analytics for Steam",
+      "Steam DashBoard is a comprehensive platform for everything Steam-related."
+    ]);
+    expect(blocks[0]?.rehydrateKey).toBe("google-search|listing|title|0|SteamDB - Chrome Web Store");
+    expect(blocks[1]?.rehydrateKey).toBe(
+      "google-search|listing|snippet|0|Adds SteamDB links and new features on the Steam store and community."
+    );
+    expect(blocks[0]?.renderHint?.expansionRoot).toBe(firstResult);
+    expect(blocks[1]?.renderHint?.expansionRoot).toBe(firstResult);
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstSnippet);
+  });
 });

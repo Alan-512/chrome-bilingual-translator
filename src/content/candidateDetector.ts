@@ -12,7 +12,24 @@ export type CandidateBlock = {
   };
 };
 
-const CONTENT_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [slot='title'], [slot='text-body']";
+const CONTENT_SELECTOR = [
+  "p",
+  "li",
+  "blockquote",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "[slot='title']",
+  "[slot='text-body']",
+  ".VwiC3b",
+  ".yXK7lf",
+  ".MUxGbd",
+  ".hgKElc",
+  ".s3v9rd"
+].join(", ");
 const DISALLOWED_ANCESTORS = ["nav", "header", "footer", "aside", "button"];
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
 const REDUNDANT_CONTAINER_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
