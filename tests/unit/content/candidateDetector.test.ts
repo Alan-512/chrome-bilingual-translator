@@ -208,6 +208,8 @@ describe("collectCandidateBlocks", () => {
     } as ParentNode;
 
     const blocks = collectCandidateBlocks(root);
+    const firstModelCard = document.querySelector(".model-card") as HTMLElement;
+    const firstModelSummary = firstModelCard.querySelector("p") as HTMLParagraphElement;
 
     expect(blocks.map((block) => block.sourceText)).toEqual([
       "OpenAI: GPT-4o Mini TTS",
@@ -215,6 +217,9 @@ describe("collectCandidateBlocks", () => {
       "Google: Gemini Embedding 2 Preview",
       "Gemini Embedding 2 Preview is Google's first multimodal embedding model."
     ]);
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstModelSummary);
+    expect(blocks[0]?.renderHint?.expansionRoot).toBe(firstModelCard);
+    expect(blocks[1]?.renderHint?.expansionRoot).toBe(firstModelCard);
   });
 
   it("limits Product Hunt candidates to the main product content area", () => {
