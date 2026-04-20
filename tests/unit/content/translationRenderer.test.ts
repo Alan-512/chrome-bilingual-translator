@@ -75,6 +75,22 @@ describe("renderTranslationBelow", () => {
     expect(styleTag?.textContent).toContain("color: inherit");
     expect(styleTag?.textContent).toContain("border-top-color: currentColor");
     expect(styleTag?.textContent).toContain("border-bottom: 2px dashed");
+    expect(styleTag?.textContent).toContain("unicode-bidi: plaintext");
+    expect(styleTag?.textContent).toContain("writing-mode: horizontal-tb");
+  });
+
+  it("forces a stable left-to-right translation container in pages with conflicting text direction", () => {
+    document.body.innerHTML = `<main dir="rtl"><p id="source">Hello world.</p></main>`;
+    const source = document.getElementById("source") as HTMLParagraphElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "这是中文译文"
+    });
+
+    const translation = source.nextElementSibling as HTMLElement;
+    expect(translation.getAttribute("lang")).toBe("zh-CN");
+    expect(translation.getAttribute("dir")).toBe("ltr");
   });
 
   it("re-attaches the translated result when the source node was replaced during rendering", () => {

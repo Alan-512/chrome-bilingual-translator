@@ -22,6 +22,7 @@ const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
 const FALLBACK_SOURCE_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [slot='title'], [slot='text-body']";
 const EXPANDED_ATTRIBUTE = "data-bilingual-translator-expanded";
 const SEMANTIC_BLOCK_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
+const TRANSLATION_LANGUAGE = "zh-CN";
 
 function ensureTranslationStyles(doc: Document): void {
   if (doc.head?.querySelector(`[${STYLE_ATTRIBUTE}='true']`)) {
@@ -36,6 +37,10 @@ function ensureTranslationStyles(doc: Document): void {
       color: inherit;
       font-size: 0.9em;
       line-height: 1.45;
+      unicode-bidi: plaintext;
+      writing-mode: horizontal-tb;
+      text-orientation: mixed;
+      text-align: start;
     }
 
     .bilingual-translator-translation[data-bilingual-translator-state="translated"] {
@@ -111,6 +116,8 @@ function getOrCreateTranslationElement(
   const translationElement = sourceElement.ownerDocument.createElement("div");
   translationElement.setAttribute(OWNED_ATTRIBUTE, "true");
   translationElement.setAttribute(BLOCK_ID_ATTRIBUTE, blockId);
+  translationElement.setAttribute("lang", TRANSLATION_LANGUAGE);
+  translationElement.setAttribute("dir", "ltr");
   translationElement.className = "bilingual-translator-translation";
   anchorElement.insertAdjacentElement("afterend", translationElement);
   return translationElement;
