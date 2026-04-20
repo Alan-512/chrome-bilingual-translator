@@ -248,4 +248,25 @@ describe("renderTranslationBelow", () => {
     expect(card.style.overflow).toBe("visible");
     expect(card.style.maxHeight).toBe("none");
   });
+
+  it("aligns translation blocks with centered source paragraphs", () => {
+    document.body.innerHTML = `
+      <main>
+        <p id="source" style="width: 640px; margin-left: 220px; margin-right: 220px;">
+          Our models are evolving at a rapid clip.
+        </p>
+      </main>
+    `;
+    const source = document.getElementById("source") as HTMLParagraphElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "我们的模型正在快速演进。"
+    });
+
+    const translation = source.nextElementSibling as HTMLElement;
+    expect(translation.style.width).toBe("640px");
+    expect(translation.style.marginLeft).toBe("220px");
+    expect(translation.style.marginRight).toBe("220px");
+  });
 });

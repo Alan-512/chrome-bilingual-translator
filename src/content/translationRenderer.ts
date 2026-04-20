@@ -173,6 +173,29 @@ function getTranslationAnchorElement(sourceElement: HTMLElement, explicitAnchorE
   return resolveSourceTranslationAnchor(sourceElement);
 }
 
+function isCssLength(value: string): boolean {
+  return /^-?\d+(?:\.\d+)?px$/.test(value);
+}
+
+function applyHorizontalLayoutFromAnchor(translationElement: HTMLElement, anchorElement: HTMLElement): void {
+  const computedStyle = anchorElement.ownerDocument.defaultView?.getComputedStyle(anchorElement);
+  if (!computedStyle) {
+    return;
+  }
+
+  if (isCssLength(computedStyle.width)) {
+    translationElement.style.width = computedStyle.width;
+  }
+
+  if (isCssLength(computedStyle.marginLeft)) {
+    translationElement.style.marginLeft = computedStyle.marginLeft;
+  }
+
+  if (isCssLength(computedStyle.marginRight)) {
+    translationElement.style.marginRight = computedStyle.marginRight;
+  }
+}
+
 function getOrCreateTranslationElement(
   sourceElement: HTMLElement,
   blockId: string,
@@ -184,6 +207,7 @@ function getOrCreateTranslationElement(
     `[${OWNED_ATTRIBUTE}='true'][${BLOCK_ID_ATTRIBUTE}='${blockId}']`
   );
   if (existing) {
+    applyHorizontalLayoutFromAnchor(existing, anchorElement);
     return existing;
   }
 
@@ -195,6 +219,7 @@ function getOrCreateTranslationElement(
   translationElement.className = "bilingual-translator-translation";
   translationElement.style.direction = "ltr";
   translationElement.style.unicodeBidi = "plaintext";
+  applyHorizontalLayoutFromAnchor(translationElement, anchorElement);
   anchorElement.insertAdjacentElement("afterend", translationElement);
   return translationElement;
 }
