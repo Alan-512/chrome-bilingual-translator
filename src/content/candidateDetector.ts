@@ -31,7 +31,8 @@ const CONTENT_SELECTOR = [
   ".s3v9rd",
   ".related-question-pair [role='heading']",
   ".kp-wholepage [data-attrid='title']",
-  ".kp-wholepage .kno-rdesc span"
+  ".kp-wholepage .kno-rdesc span",
+  "[data-testid='model-list-item'] a[href]"
 ].join(", ");
 const DISALLOWED_ANCESTORS = ["nav", "header", "footer", "aside", "button"];
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
@@ -128,6 +129,10 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
   });
 
   if (matchedSiteCandidate) {
+    return siteCandidates;
+  }
+
+  if (!allowGenericFallbackForPage(page)) {
     return siteCandidates;
   }
 

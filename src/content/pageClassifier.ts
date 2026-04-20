@@ -18,7 +18,7 @@ function looksLikeOpenRouterDocument(doc: Document): boolean {
     return false;
   }
 
-  return doc.querySelector(".model-card, [data-testid='model-card'], [data-or-route='model-card']") !== null;
+  return doc.querySelector(".model-card, [data-testid='model-card'], [data-testid='model-list-item'], [data-or-route='model-card']") !== null;
 }
 
 function looksLikeProductHuntDocument(doc: Document): boolean {

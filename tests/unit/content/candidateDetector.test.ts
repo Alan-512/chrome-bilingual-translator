@@ -283,7 +283,57 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(firstModelCard);
   });
 
-  it("falls back to generic detection when an OpenRouter models page uses unknown card markup", () => {
+  it("limits OpenRouter candidates to the virtualized model list item structure", () => {
+    document.body.innerHTML = `
+      <main>
+        <aside>
+          <p>Input Modalities</p>
+          <p>Text</p>
+        </aside>
+        <ul>
+          <li style="height: 180px; transform: translateY(0px);">
+            <div>
+              <div data-testid="model-list-item">
+                <div>
+                  <a href="/openai">OpenAI</a>
+                  <a href="/openai/gpt-4o-mini-tts-2025-12-15">
+                    <span class="hidden md:block">OpenAI: GPT-4o Mini TTS</span>
+                    <span class="md:hidden">GPT-4o Mini TTS</span>
+                  </a>
+                  <span>516K tokens</span>
+                </div>
+                <a href="/openai/gpt-4o-mini-tts-2025-12-15">
+                  GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.
+                </a>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </main>
+    `;
+    const root = {
+      ownerDocument: {
+        ...document,
+        location: new URL("https://openrouter.ai/models")
+      },
+      querySelectorAll: document.querySelectorAll.bind(document)
+    } as ParentNode;
+
+    const blocks = collectCandidateBlocks(root);
+    const modelListItem = document.querySelector("[data-testid='model-list-item']") as HTMLElement;
+    const virtualRow = modelListItem.closest("li") as HTMLElement;
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "OpenAI: GPT-4o Mini TTS",
+      "GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model."
+    ]);
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(modelListItem);
+    expect(blocks[1]?.renderHint?.anchorElement).toBe(modelListItem);
+    expect(blocks[0]?.renderHint?.expansionRoot).toBe(virtualRow);
+    expect(blocks[1]?.renderHint?.expansionRoot).toBe(virtualRow);
+  });
+
+  it("does not fall back to generic detection when an OpenRouter models page uses unknown card markup", () => {
     document.body.innerHTML = `
       <main>
         <aside>
@@ -307,11 +357,7 @@ describe("collectCandidateBlocks", () => {
 
     const blocks = collectCandidateBlocks(root);
 
-    expect(blocks.map((block) => block.sourceText)).toEqual([
-      "OpenAI: GPT-4o Mini TTS",
-      "GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model."
-    ]);
-    expect(blocks.every((block) => block.renderHint == null)).toBe(true);
+    expect(blocks).toEqual([]);
   });
 
   it("limits Product Hunt candidates to the main product content area", () => {

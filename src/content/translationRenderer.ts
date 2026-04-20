@@ -21,6 +21,9 @@ const STYLE_ATTRIBUTE = "data-bilingual-translator-style";
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
 const FALLBACK_SOURCE_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [slot='title'], [slot='text-body']";
 const EXPANDED_ATTRIBUTE = "data-bilingual-translator-expanded";
+const VIRTUAL_ROW_BASE_HEIGHT_ATTRIBUTE = "data-bilingual-translator-base-height";
+const VIRTUAL_ROW_BASE_Y_ATTRIBUTE = "data-bilingual-translator-base-y";
+const VIRTUAL_LIST_BASE_HEIGHT_ATTRIBUTE = "data-bilingual-translator-base-height";
 const SEMANTIC_BLOCK_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
 const TRANSLATION_LANGUAGE = "zh-CN";
 const INLINE_TAG_NAMES = new Set([
@@ -267,6 +270,117 @@ function relaxClippedAncestors(sourceElement: HTMLElement, expansionRoot?: HTMLE
   }
 }
 
+function parsePixelValue(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/(-?\d+(?:\.\d+)?)px/);
+  return match ? Number(match[1]) : null;
+}
+
+function parseTranslateY(value: string | null | undefined): number | null {
+  if (!value || value === "none") {
+    return null;
+  }
+
+  const translateMatch = value.match(/translateY\((-?\d+(?:\.\d+)?)px\)/);
+  if (translateMatch) {
+    return Number(translateMatch[1]);
+  }
+
+  const matrixMatch = value.match(/matrix\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,\s*(-?\d+(?:\.\d+)?)\)/);
+  if (matrixMatch) {
+    return Number(matrixMatch[1]);
+  }
+
+  return null;
+}
+
+function getVirtualRowBaseHeight(row: HTMLElement): number {
+  const storedHeightAttribute = row.getAttribute(VIRTUAL_ROW_BASE_HEIGHT_ATTRIBUTE);
+  const storedHeight = Number(storedHeightAttribute);
+  if (storedHeightAttribute !== null && Number.isFinite(storedHeight) && storedHeight > 0) {
+    return storedHeight;
+  }
+
+  const computedStyle = row.ownerDocument.defaultView?.getComputedStyle(row);
+  const baseHeight =
+    parsePixelValue(row.style.height) ?? parsePixelValue(computedStyle?.height) ?? Math.ceil(row.getBoundingClientRect().height);
+  row.setAttribute(VIRTUAL_ROW_BASE_HEIGHT_ATTRIBUTE, String(baseHeight));
+  return baseHeight;
+}
+
+function getVirtualRowBaseY(row: HTMLElement): number {
+  const storedYAttribute = row.getAttribute(VIRTUAL_ROW_BASE_Y_ATTRIBUTE);
+  const storedY = Number(storedYAttribute);
+  if (storedYAttribute !== null && Number.isFinite(storedY)) {
+    return storedY;
+  }
+
+  const computedStyle = row.ownerDocument.defaultView?.getComputedStyle(row);
+  const baseY = parseTranslateY(row.style.transform) ?? parseTranslateY(computedStyle?.transform) ?? 0;
+  row.setAttribute(VIRTUAL_ROW_BASE_Y_ATTRIBUTE, String(baseY));
+  return baseY;
+}
+
+function getVirtualListBaseHeight(list: HTMLElement): number {
+  const storedHeightAttribute = list.getAttribute(VIRTUAL_LIST_BASE_HEIGHT_ATTRIBUTE);
+  const storedHeight = Number(storedHeightAttribute);
+  if (storedHeightAttribute !== null && Number.isFinite(storedHeight) && storedHeight > 0) {
+    return storedHeight;
+  }
+
+  const computedStyle = list.ownerDocument.defaultView?.getComputedStyle(list);
+  const baseHeight =
+    parsePixelValue(list.style.height) ?? parsePixelValue(computedStyle?.height) ?? Math.ceil(list.getBoundingClientRect().height);
+  list.setAttribute(VIRTUAL_LIST_BASE_HEIGHT_ATTRIBUTE, String(baseHeight));
+  return baseHeight;
+}
+
+function resolveVirtualizedRow(expansionRoot?: HTMLElement): HTMLElement | null {
+  const row = expansionRoot?.matches("li[style*='translateY']") ? expansionRoot : expansionRoot?.closest<HTMLElement>("li[style*='translateY']");
+  if (!row?.parentElement) {
+    return null;
+  }
+
+  const computedStyle = row.ownerDocument.defaultView?.getComputedStyle(row);
+  if (computedStyle?.position !== "absolute" && row.style.position !== "absolute") {
+    return null;
+  }
+
+  return row;
+}
+
+function updateVirtualizedListLayout(expansionRoot?: HTMLElement): void {
+  const activeRow = resolveVirtualizedRow(expansionRoot);
+  const list = activeRow?.parentElement;
+  if (!activeRow || !list) {
+    return;
+  }
+
+  const rows = Array.from(list.children)
+    .filter((child): child is HTMLElement => child instanceof HTMLElement)
+    .filter((row) => row.matches("li[style*='translateY']"))
+    .sort((a, b) => getVirtualRowBaseY(a) - getVirtualRowBaseY(b));
+
+  let accumulatedExtraHeight = 0;
+  rows.forEach((row) => {
+    const baseY = getVirtualRowBaseY(row);
+    const baseHeight = getVirtualRowBaseHeight(row);
+    row.style.minHeight = `${baseHeight}px`;
+    row.style.height = "auto";
+
+    const expandedHeight = Math.max(baseHeight, Math.ceil(row.scrollHeight));
+    row.style.height = `${expandedHeight}px`;
+    row.style.transform = `translateY(${baseY + accumulatedExtraHeight}px)`;
+    accumulatedExtraHeight += expandedHeight - baseHeight;
+  });
+
+  const listBaseHeight = getVirtualListBaseHeight(list);
+  list.style.height = `${listBaseHeight + accumulatedExtraHeight}px`;
+}
+
 function normalizeText(text: string | null | undefined): string {
   return text?.replace(/\s+/g, " ").trim() ?? "";
 }
@@ -336,6 +450,7 @@ export function renderTranslationLoadingBelow(
     delete translationElement.dataset.bilingualTranslatorLayout;
   }
 
+  updateVirtualizedListLayout(input.expansionRoot);
   return translationElement;
 }
 
@@ -352,6 +467,7 @@ export function renderTranslationBelow(sourceElement: HTMLElement, input: Render
     delete translationElement.dataset.bilingualTranslatorLayout;
   }
 
+  updateVirtualizedListLayout(input.expansionRoot);
   return translationElement;
 }
 

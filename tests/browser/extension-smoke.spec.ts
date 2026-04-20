@@ -351,7 +351,19 @@ test("expands GitHub README and OpenRouter model cards when translations are ins
     }
     await injectAndActivate(background, openRouterTab.id);
 
-    await expect(openRouterPage.locator(".model-card").first()).toHaveAttribute("data-bilingual-translator-expanded", "true");
+    const firstRow = openRouterPage.locator(".virtual-row").first();
+    const secondRow = openRouterPage.locator(".virtual-row").nth(1);
+    await expect(firstRow).toHaveAttribute("data-bilingual-translator-expanded", "true");
+    await expect(openRouterPage.locator(".virtual-row [data-bilingual-translator-owned='true']").first()).toContainText(
+      "中文翻译"
+    );
+
+    const firstBox = await firstRow.boundingBox();
+    const secondBox = await secondRow.boundingBox();
+    if (!firstBox || !secondBox) {
+      throw new Error("OpenRouter virtual rows did not produce layout boxes.");
+    }
+    expect(secondBox.y).toBeGreaterThanOrEqual(firstBox.y + firstBox.height - 1);
   } finally {
     await context.close();
     await mockServer.close();

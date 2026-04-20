@@ -5,12 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenRouter Models Fixture</title>
     <style>
+      .virtual-list {
+        position: relative;
+        width: 720px;
+        height: 360px;
+      }
+
+      .virtual-row {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 4px;
+        box-sizing: border-box;
+      }
+
       .model-card {
-        overflow: hidden;
-        max-height: 120px;
+        height: 100%;
         border: 1px solid #ddd;
+        border-radius: 12px;
+        box-sizing: border-box;
         padding: 16px;
-        margin-bottom: 16px;
+        overflow: hidden;
+      }
+
+      [data-testid="model-list-item"] {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .model-heading-row {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .model-title {
+        font-size: 20px;
+        font-weight: 600;
+      }
+
+      .model-summary {
+        color: #5f6673;
       }
     </style>
   </head>
@@ -20,10 +59,37 @@
       <aside>
         <p>Input Modalities</p>
       </aside>
-      <article class="model-card">
-        <h2>OpenAI: GPT-4o Mini TTS</h2>
-        <p>GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.</p>
-      </article>
+      <ul class="virtual-list">
+        <li class="virtual-row" style="height: 120px; transform: translateY(0px);">
+          <article class="model-card">
+            <div data-testid="model-list-item">
+              <div class="model-heading-row">
+                <a href="/openai/gpt-4o-mini-tts-2025-12-15" class="model-title">
+                  <span class="hidden md:block">OpenAI: GPT-4o Mini TTS</span>
+                  <span class="md:hidden">GPT-4o Mini TTS</span>
+                </a>
+                <span>516K tokens</span>
+              </div>
+              <a href="/openai/gpt-4o-mini-tts-2025-12-15" class="model-summary">
+                GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model. It converts text input into natural-sounding audio output.
+              </a>
+            </div>
+          </article>
+        </li>
+        <li class="virtual-row" style="height: 120px; transform: translateY(120px);">
+          <article class="model-card">
+            <div data-testid="model-list-item">
+              <div class="model-heading-row">
+                <a href="/google/gemini-embedding-2-preview" class="model-title">Google: Gemini Embedding 2 Preview</a>
+                <span>848M tokens</span>
+              </div>
+              <a href="/google/gemini-embedding-2-preview" class="model-summary">
+                Gemini Embedding 2 Preview maps text, images, video, audio, and PDFs into a unified vector space.
+              </a>
+            </div>
+          </article>
+        </li>
+      </ul>
     </main>
   </body>
 </html>

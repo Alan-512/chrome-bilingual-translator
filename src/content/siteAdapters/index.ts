@@ -25,7 +25,7 @@ const REDDIT_ADAPTER: SiteAdapter = {
 };
 
 const GITHUB_ADAPTER: SiteAdapter = {
-  allowGenericFallback: () => false,
+  allowGenericFallback: () => true,
   collectCandidateBlock: collectGitHubCandidateBlock
 };
 
