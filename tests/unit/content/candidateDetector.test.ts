@@ -177,4 +177,43 @@ describe("collectCandidateBlocks", () => {
       "Turn Claude Code into a full game dev studio."
     ]);
   });
+
+  it("limits OpenRouter candidates to model card content", () => {
+    document.body.innerHTML = `
+      <main>
+        <p>Models</p>
+        <aside>
+          <p>Input Modalities</p>
+          <p>Text</p>
+        </aside>
+        <section>
+          <article class="model-card">
+            <h2>OpenAI: GPT-4o Mini TTS</h2>
+            <p>GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.</p>
+          </article>
+          <article class="model-card">
+            <h2>Google: Gemini Embedding 2 Preview</h2>
+            <p>Gemini Embedding 2 Preview is Google's first multimodal embedding model.</p>
+          </article>
+        </section>
+      </main>
+    `;
+
+    const root = {
+      ownerDocument: {
+        ...document,
+        location: new URL("https://openrouter.ai/models")
+      },
+      querySelectorAll: document.querySelectorAll.bind(document)
+    } as ParentNode;
+
+    const blocks = collectCandidateBlocks(root);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "OpenAI: GPT-4o Mini TTS",
+      "GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.",
+      "Google: Gemini Embedding 2 Preview",
+      "Gemini Embedding 2 Preview is Google's first multimodal embedding model."
+    ]);
+  });
 });

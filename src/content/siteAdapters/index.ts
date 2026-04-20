@@ -1,6 +1,7 @@
 import type { CandidateBlock } from "../candidateDetector";
 import type { PageClassification } from "../pageClassifier";
 import { collectGitHubCandidateBlock } from "./githubCandidateAdapter";
+import { collectOpenRouterCandidateBlock } from "./openRouterCandidateAdapter";
 import { collectRedditCandidateBlock } from "./redditCandidateAdapter";
 
 type SiteAdapterHelpers = {
@@ -27,8 +28,8 @@ const GITHUB_ADAPTER: SiteAdapter = {
 };
 
 const OPENROUTER_ADAPTER: SiteAdapter = {
-  allowGenericFallback: () => true,
-  collectCandidateBlock: () => null
+  allowGenericFallback: () => false,
+  collectCandidateBlock: collectOpenRouterCandidateBlock
 };
 
 const PRODUCT_HUNT_ADAPTER: SiteAdapter = {
