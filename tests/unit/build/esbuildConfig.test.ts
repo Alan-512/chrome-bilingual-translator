@@ -11,4 +11,11 @@ describe("esbuild config", () => {
     expect(configSource).not.toContain("/mnt/d/project/chrome-bilingual-translator");
     expect(configSource).toContain("import.meta.url");
   });
+
+  it("defines a release output directory for loading the packed extension without the dev workspace", async () => {
+    const configPath = path.resolve("esbuild.config.mjs");
+    const configSource = await readFile(configPath, "utf8");
+
+    expect(configSource).toContain('path.join(projectRoot, "release")');
+  });
 });
