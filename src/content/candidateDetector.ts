@@ -1,5 +1,5 @@
 import { classifyPage } from "./pageClassifier";
-import { collectSiteCandidateBlock } from "./siteAdapters";
+import { allowGenericFallbackForPage, collectSiteCandidateBlock } from "./siteAdapters";
 
 export type CandidateBlock = {
   blockId: string;
@@ -56,7 +56,7 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
   const groupedFeedCardIds = new Set<string>();
   const doc = root instanceof Document ? root : root.ownerDocument;
   const page = classifyPage(doc);
-  const useGenericFallback = page.site === "generic" || (page.site === "reddit" && page.surface === "detail");
+  const useGenericFallback = allowGenericFallbackForPage(page);
 
   elements.forEach((element) => {
     if (isExtensionOwned(element) || isHidden(element)) {
