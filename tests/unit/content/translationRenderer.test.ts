@@ -74,7 +74,9 @@ describe("renderTranslationBelow", () => {
     const styleTag = document.head.querySelector("[data-bilingual-translator-style='true']");
     expect(styleTag?.textContent).toContain("color: inherit");
     expect(styleTag?.textContent).toContain("border-top-color: currentColor");
-    expect(styleTag?.textContent).toContain("border-bottom: 2px dashed");
+    expect(styleTag?.textContent).toContain("text-decoration-line: underline");
+    expect(styleTag?.textContent).toContain("text-decoration-style: dashed");
+    expect(styleTag?.textContent).not.toContain("border-bottom: 2px dashed");
     expect(styleTag?.textContent).toContain("unicode-bidi: plaintext");
     expect(styleTag?.textContent).toContain("writing-mode: horizontal-tb");
   });

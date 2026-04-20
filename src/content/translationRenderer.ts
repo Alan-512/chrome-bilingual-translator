@@ -78,7 +78,11 @@ function ensureTranslationStyles(doc: Document): void {
       display: block;
       width: fit-content;
       max-width: 100%;
-      border-bottom: 2px dashed color-mix(in srgb, currentColor 64%, transparent);
+      text-decoration-line: underline;
+      text-decoration-style: dashed;
+      text-decoration-color: color-mix(in srgb, currentColor 64%, transparent);
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
       padding-bottom: 2px;
     }
 
