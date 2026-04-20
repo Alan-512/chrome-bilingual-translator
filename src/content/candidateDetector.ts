@@ -5,6 +5,10 @@ export type CandidateBlock = {
   blockId: string;
   element: HTMLElement;
   sourceText: string;
+  renderHint?: {
+    anchorElement?: HTMLElement;
+    expansionRoot?: HTMLElement;
+  };
 };
 
 const CONTENT_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [slot='title'], [slot='text-body']";

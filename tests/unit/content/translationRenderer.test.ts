@@ -130,6 +130,29 @@ describe("renderTranslationBelow", () => {
     expect((heading.nextElementSibling as HTMLElement).textContent).toBe("Claude Code 游戏工作室");
   });
 
+  it("supports an explicit anchor element for site-specific rendering strategies", () => {
+    document.body.innerHTML = `
+      <main>
+        <article id="card">
+          <h2 id="title">OpenAI: GPT-4o Mini TTS</h2>
+          <p id="summary">Cost-efficient text-to-speech model.</p>
+        </article>
+      </main>
+    `;
+    const title = document.getElementById("title") as HTMLHeadingElement;
+    const summary = document.getElementById("summary") as HTMLParagraphElement;
+
+    renderTranslationBelow(title, {
+      blockId: "alpha",
+      translationText: "OpenAI：GPT-4o Mini TTS",
+      anchorElement: summary
+    });
+
+    expect(title.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).not.toBe("true");
+    expect(summary.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
+    expect((summary.nextElementSibling as HTMLElement).textContent).toBe("OpenAI：GPT-4o Mini TTS");
+  });
+
   it("relaxes clipped card containers so the translated text can fully expand", () => {
     document.body.innerHTML = `
       <main>

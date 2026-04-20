@@ -225,7 +225,9 @@ export function createPageController(doc: Document, dependencies: PageController
       renderTranslationBelow(candidate.element, {
         blockId: candidate.blockId,
         translationText,
-        sourceText: candidate.sourceText
+        sourceText: candidate.sourceText,
+        anchorElement: candidate.renderHint?.anchorElement,
+        expansionRoot: candidate.renderHint?.expansionRoot
       });
       translationMemory.set(getCandidateSignature(candidate), translationText);
       inFlightSignatures.delete(getCandidateSignature(candidate));
@@ -300,7 +302,9 @@ export function createPageController(doc: Document, dependencies: PageController
       renderTranslationBelow(candidate.element, {
         blockId: candidate.blockId,
         translationText: cachedTranslation,
-        sourceText: candidate.sourceText
+        sourceText: candidate.sourceText,
+        anchorElement: candidate.renderHint?.anchorElement,
+        expansionRoot: candidate.renderHint?.expansionRoot
       });
       stateStore.set(candidate.blockId, "translated");
       debugLog("candidate/rehydrated-from-memory", {
@@ -320,7 +324,9 @@ export function createPageController(doc: Document, dependencies: PageController
       candidateBatch.forEach((candidate) => {
         stateStore.set(candidate.blockId, "pending");
         renderTranslationLoadingBelow(candidate.element, {
-          blockId: candidate.blockId
+          blockId: candidate.blockId,
+          anchorElement: candidate.renderHint?.anchorElement,
+          expansionRoot: candidate.renderHint?.expansionRoot
         });
       });
       pendingBlockCount += candidateBatch.length;

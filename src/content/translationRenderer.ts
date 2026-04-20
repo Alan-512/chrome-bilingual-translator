@@ -3,11 +3,15 @@ type RenderTranslationInput = {
   translationText: string;
   sourceText?: string;
   tightLayout?: boolean;
+  anchorElement?: HTMLElement;
+  expansionRoot?: HTMLElement;
 };
 
 type RenderTranslationLoadingInput = {
   blockId: string;
   tightLayout?: boolean;
+  anchorElement?: HTMLElement;
+  expansionRoot?: HTMLElement;
 };
 
 const OWNED_ATTRIBUTE = "data-bilingual-translator-owned";
@@ -74,7 +78,11 @@ function getComputedDisplay(element: HTMLElement): string {
   return element.ownerDocument.defaultView?.getComputedStyle(element).display ?? "";
 }
 
-function getTranslationAnchorElement(sourceElement: HTMLElement): HTMLElement {
+function getTranslationAnchorElement(sourceElement: HTMLElement, explicitAnchorElement?: HTMLElement): HTMLElement {
+  if (explicitAnchorElement) {
+    return explicitAnchorElement;
+  }
+
   const sourceDisplay = getComputedDisplay(sourceElement);
   const isInlineLikeSource =
     sourceElement.matches("[slot='title']") || sourceDisplay.startsWith("inline") || sourceDisplay === "contents";
@@ -86,9 +94,13 @@ function getTranslationAnchorElement(sourceElement: HTMLElement): HTMLElement {
   return sourceElement.closest<HTMLElement>(SEMANTIC_BLOCK_SELECTOR) ?? sourceElement;
 }
 
-function getOrCreateTranslationElement(sourceElement: HTMLElement, blockId: string): HTMLElement {
+function getOrCreateTranslationElement(
+  sourceElement: HTMLElement,
+  blockId: string,
+  explicitAnchorElement?: HTMLElement
+): HTMLElement {
   ensureTranslationStyles(sourceElement.ownerDocument);
-  const anchorElement = getTranslationAnchorElement(sourceElement);
+  const anchorElement = getTranslationAnchorElement(sourceElement, explicitAnchorElement);
   const existing = anchorElement.parentElement?.querySelector<HTMLElement>(
     `[${OWNED_ATTRIBUTE}='true'][${BLOCK_ID_ATTRIBUTE}='${blockId}']`
   );
@@ -104,7 +116,14 @@ function getOrCreateTranslationElement(sourceElement: HTMLElement, blockId: stri
   return translationElement;
 }
 
-function relaxClippedAncestors(sourceElement: HTMLElement): void {
+function relaxClippedAncestors(sourceElement: HTMLElement, expansionRoot?: HTMLElement): void {
+  if (expansionRoot) {
+    expansionRoot.setAttribute(EXPANDED_ATTRIBUTE, "true");
+    expansionRoot.style.overflow = "visible";
+    expansionRoot.style.maxHeight = "none";
+    return;
+  }
+
   let current: HTMLElement | null = sourceElement.parentElement;
 
   while (current) {
@@ -180,8 +199,8 @@ export function renderTranslationLoadingBelow(
   sourceElement: HTMLElement,
   input: RenderTranslationLoadingInput
 ): HTMLElement {
-  relaxClippedAncestors(sourceElement);
-  const translationElement = getOrCreateTranslationElement(sourceElement, input.blockId);
+  relaxClippedAncestors(sourceElement, input.expansionRoot);
+  const translationElement = getOrCreateTranslationElement(sourceElement, input.blockId, input.anchorElement);
   translationElement.setAttribute(STATE_ATTRIBUTE, "loading");
   translationElement.replaceChildren();
 
@@ -205,8 +224,8 @@ export function renderTranslationLoadingBelow(
 
 export function renderTranslationBelow(sourceElement: HTMLElement, input: RenderTranslationInput): HTMLElement {
   const liveSourceElement = resolveLiveSourceElement(sourceElement, input.blockId, input.sourceText);
-  relaxClippedAncestors(liveSourceElement);
-  const translationElement = getOrCreateTranslationElement(liveSourceElement, input.blockId);
+  relaxClippedAncestors(liveSourceElement, input.expansionRoot);
+  const translationElement = getOrCreateTranslationElement(liveSourceElement, input.blockId, input.anchorElement);
   translationElement.setAttribute(STATE_ATTRIBUTE, "translated");
   translationElement.textContent = input.translationText;
 
