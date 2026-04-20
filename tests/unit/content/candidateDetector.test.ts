@@ -87,7 +87,7 @@ describe("collectCandidateBlocks", () => {
       "A Reddit feed title that should be translated\n\nA feed preview paragraph that is shown on the homepage card."
     );
     expect(blocks[0]?.rehydrateKey).toBe(
-      "reddit|listing|A Reddit feed title that should be translated|A feed preview paragraph that is shown on the homepage card."
+      "reddit|listing|card|A Reddit feed title that should be translated|A feed preview paragraph that is shown on the homepage card."
     );
     expect(blocks[0]?.renderHint?.anchorElement).toBe(feedBody);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(feedCard);
@@ -149,6 +149,15 @@ describe("collectCandidateBlocks", () => {
       }
     ]);
     expect(blocks[0]?.renderHint?.anchorElement).toBe(firstParagraph);
+    expect(blocks[0]?.rehydrateKey).toBe(
+      "reddit|detail|post-title|I found out why ChatGPT gets slower the longer you use it"
+    );
+    expect(blocks[1]?.rehydrateKey).toBe(
+      "reddit|detail|post-body|0|Been frustrated with chatgpt freezing in long chats for months."
+    );
+    expect(blocks[2]?.rehydrateKey).toBe(
+      "reddit|detail|post-body|1|Chatgpt renders every single message in your browser at once."
+    );
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(postCard);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(postCard);
   });
@@ -191,11 +200,11 @@ describe("collectCandidateBlocks", () => {
       "Turn a single Claude Code session into a full game development studio.",
       "Turn Claude Code into a full game dev studio."
     ]);
-    expect(blocks[0]?.rehydrateKey).toBe("github|repo-home|readme|Claude Code Game Studios");
+    expect(blocks[0]?.rehydrateKey).toBe("github|repo-home|readme|title|0|Claude Code Game Studios");
     expect(blocks[1]?.rehydrateKey).toBe(
-      "github|repo-home|readme|Turn a single Claude Code session into a full game development studio."
+      "github|repo-home|readme|body|0|Turn a single Claude Code session into a full game development studio."
     );
-    expect(blocks[2]?.rehydrateKey).toBe("github|repo-home|about|Turn Claude Code into a full game dev studio.");
+    expect(blocks[2]?.rehydrateKey).toBe("github|repo-home|about|body|0|Turn Claude Code into a full game dev studio.");
     expect(blocks[0]?.renderHint?.anchorElement).toBe(firstReadmeParagraph);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(readme);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(readme);

@@ -28,8 +28,18 @@ function getNormalizedGroupedText(element: HTMLElement | null): string {
   return getNormalizedText(element);
 }
 
+function normalizePart(part: string) {
+  return part.replace(/\s+/g, " ").trim();
+}
+
 function buildRedditRehydrateKey(page: PageClassification, parts: string[]) {
-  return ["reddit", page.surface, ...parts.map((part) => part.replace(/\s+/g, " ").trim()).filter(Boolean)].join("|");
+  return ["reddit", page.surface, ...parts.map(normalizePart).filter(Boolean)].join("|");
+}
+
+function getBodyBlockIndex(bodyElement: HTMLElement, element: HTMLElement) {
+  const bodyBlocks = Array.from(bodyElement.querySelectorAll<HTMLElement>("p, li, blockquote"));
+  const blockIndex = bodyBlocks.indexOf(element);
+  return blockIndex >= 0 ? blockIndex : 0;
 }
 
 export function collectRedditCandidateBlock(
@@ -57,7 +67,7 @@ export function collectRedditCandidateBlock(
       blockId: helpers.getStableBlockId(anchorElement),
       element: anchorElement,
       sourceText: sourceParts.join("\n\n"),
-      rehydrateKey: buildRedditRehydrateKey(page, sourceParts),
+      rehydrateKey: buildRedditRehydrateKey(page, ["card", ...sourceParts]),
       renderHint: {
         anchorElement,
         expansionRoot: feedCard
@@ -79,7 +89,7 @@ export function collectRedditCandidateBlock(
       blockId: helpers.getStableBlockId(element),
       element,
       sourceText,
-      rehydrateKey: buildRedditRehydrateKey(page, [sourceText]),
+      rehydrateKey: buildRedditRehydrateKey(page, ["post-title", sourceText]),
       renderHint: {
         anchorElement: bodyElement?.querySelector<HTMLElement>("p, li, blockquote") ?? undefined,
         expansionRoot: feedCard
@@ -92,7 +102,11 @@ export function collectRedditCandidateBlock(
       blockId: helpers.getStableBlockId(element),
       element,
       sourceText,
-      rehydrateKey: buildRedditRehydrateKey(page, [sourceText]),
+      rehydrateKey: buildRedditRehydrateKey(page, [
+        "post-body",
+        String(getBodyBlockIndex(bodyElement, element)),
+        sourceText
+      ]),
       renderHint: {
         expansionRoot: feedCard
       }
