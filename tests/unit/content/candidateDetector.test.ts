@@ -140,4 +140,41 @@ describe("collectCandidateBlocks", () => {
       }
     ]);
   });
+
+  it("limits GitHub repository home candidates to README and about content", () => {
+    document.body.innerHTML = `
+      <main>
+        <div id="files">
+          <p>Update FUNDING.yml: GitHub Sponsors + Buy Me a Coffee</p>
+        </div>
+        <section id="readme">
+          <article class="markdown-body">
+            <h1>Claude Code Game Studios</h1>
+            <p>Turn a single Claude Code session into a full game development studio.</p>
+          </article>
+        </section>
+        <aside>
+          <div itemprop="about">
+            <p>Turn Claude Code into a full game dev studio.</p>
+          </div>
+        </aside>
+      </main>
+    `;
+
+    const root = {
+      ownerDocument: {
+        ...document,
+        location: new URL("https://github.com/owner/repo")
+      },
+      querySelectorAll: document.querySelectorAll.bind(document)
+    } as ParentNode;
+
+    const blocks = collectCandidateBlocks(root);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Claude Code Game Studios",
+      "Turn a single Claude Code session into a full game development studio.",
+      "Turn Claude Code into a full game dev studio."
+    ]);
+  });
 });

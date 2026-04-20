@@ -56,9 +56,10 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
   const groupedFeedCardIds = new Set<string>();
   const doc = root instanceof Document ? root : root.ownerDocument;
   const page = classifyPage(doc);
+  const useGenericFallback = page.site === "generic" || (page.site === "reddit" && page.surface === "detail");
 
   elements.forEach((element) => {
-    if (isExtensionOwned(element) || isHidden(element) || isInsideDisallowedAncestor(element) || isRedundantSlotContainer(element)) {
+    if (isExtensionOwned(element) || isHidden(element)) {
       return;
     }
 
@@ -76,6 +77,14 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
 
       groupedFeedCardIds.add(groupedFeedCard.blockId);
       candidates.push(groupedFeedCard);
+      return;
+    }
+
+    if (isInsideDisallowedAncestor(element) || isRedundantSlotContainer(element)) {
+      return;
+    }
+
+    if (!useGenericFallback) {
       return;
     }
 

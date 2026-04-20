@@ -34,6 +34,7 @@ async function settlePromises(iterations = 6) {
 
 describe("pageController", () => {
   beforeEach(() => {
+    window.history.replaceState({}, "", "/");
     document.body.innerHTML = `
       <main>
         <h2>Build Check</h2>

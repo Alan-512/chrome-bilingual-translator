@@ -1,5 +1,6 @@
 import type { CandidateBlock } from "../candidateDetector";
 import type { PageClassification } from "../pageClassifier";
+import { collectGitHubCandidateBlock } from "./githubCandidateAdapter";
 import { collectRedditCandidateBlock } from "./redditCandidateAdapter";
 
 type SiteAdapterHelpers = {
@@ -13,6 +14,10 @@ export function collectSiteCandidateBlock(
 ): CandidateBlock | null {
   if (page.site === "reddit") {
     return collectRedditCandidateBlock(element, page, helpers);
+  }
+
+  if (page.site === "github") {
+    return collectGitHubCandidateBlock(element, page, helpers);
   }
 
   return null;
