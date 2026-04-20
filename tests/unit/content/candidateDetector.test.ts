@@ -400,6 +400,7 @@ describe("collectCandidateBlocks", () => {
     );
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(firstResult);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(firstResult);
-    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstSnippet);
+    expect(blocks[0]?.renderHint?.anchorElement).toBeUndefined();
+    expect(blocks[1]?.renderHint?.anchorElement).toBeUndefined();
   });
 });

@@ -43,8 +43,6 @@ export function collectGoogleSearchCandidateBlock(
   }
 
   const resultIndex = getResultIndex(resultRoot);
-  const firstSnippet =
-    resultRoot.querySelector<HTMLElement>(".VwiC3b, .yXK7lf, .MUxGbd, .hgKElc, .s3v9rd") ?? undefined;
   const isTitleElement = element.tagName === "H3";
   const isSnippetElement = element.matches(GOOGLE_SNIPPET_SELECTOR);
   const nestedSnippetParent = isSnippetElement ? element.parentElement?.closest<HTMLElement>(GOOGLE_SNIPPET_SELECTOR) : null;
@@ -63,7 +61,6 @@ export function collectGoogleSearchCandidateBlock(
     sourceText,
     rehydrateKey: `google-search|${page.surface}|${isTitleElement ? "title" : "snippet"}|${resultIndex}|${normalizeText(sourceText)}`,
     renderHint: {
-      anchorElement: isTitleElement ? firstSnippet : undefined,
       expansionRoot: resultRoot
     }
   };
