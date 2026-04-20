@@ -150,6 +150,11 @@ function findNearestBlockContainer(element: HTMLElement): HTMLElement | null {
 }
 
 function resolveSourceTranslationAnchor(element: HTMLElement): HTMLElement {
+  const wrappingLink = element.closest<HTMLElement>("a[href]");
+  if (wrappingLink && wrappingLink !== element && wrappingLink.contains(element)) {
+    return wrappingLink;
+  }
+
   if (!isInlineLikeElement(element)) {
     return element;
   }
