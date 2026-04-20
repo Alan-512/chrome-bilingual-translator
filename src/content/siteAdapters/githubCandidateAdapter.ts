@@ -8,6 +8,12 @@ const GITHUB_ALLOWED_ROOT_SELECTOR = [
   "[data-testid='repository-about']"
 ].join(", ");
 
+const GITHUB_EXPANSION_ROOT_SELECTOR = [
+  "#readme",
+  "[itemprop='about']",
+  "[data-testid='repository-about']"
+].join(", ");
+
 type GitHubAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
 };
@@ -26,14 +32,23 @@ export function collectGitHubCandidateBlock(
     return null;
   }
 
+  const expansionRoot = element.closest<HTMLElement>(GITHUB_EXPANSION_ROOT_SELECTOR) ?? allowedRoot;
+
   const sourceText = element.textContent?.replace(/\s+/g, " ").trim() ?? "";
   if (!sourceText) {
     return null;
   }
 
+  const summaryElement = expansionRoot.querySelector<HTMLElement>("p, li, blockquote");
+  const isTitleElement = /^H[1-6]$/.test(element.tagName);
+
   return {
     blockId: helpers.getStableBlockId(element),
     element,
-    sourceText
+    sourceText,
+    renderHint: {
+      anchorElement: isTitleElement ? summaryElement ?? undefined : undefined,
+      expansionRoot
+    }
   };
 }

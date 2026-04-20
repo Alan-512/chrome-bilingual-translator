@@ -170,12 +170,19 @@ describe("collectCandidateBlocks", () => {
     } as ParentNode;
 
     const blocks = collectCandidateBlocks(root);
+    const readme = document.querySelector("#readme") as HTMLElement;
+    const firstReadmeParagraph = readme.querySelector("p") as HTMLParagraphElement;
+    const about = document.querySelector("[itemprop='about']") as HTMLElement;
 
     expect(blocks.map((block) => block.sourceText)).toEqual([
       "Claude Code Game Studios",
       "Turn a single Claude Code session into a full game development studio.",
       "Turn Claude Code into a full game dev studio."
     ]);
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstReadmeParagraph);
+    expect(blocks[0]?.renderHint?.expansionRoot).toBe(readme);
+    expect(blocks[1]?.renderHint?.expansionRoot).toBe(readme);
+    expect(blocks[2]?.renderHint?.expansionRoot).toBe(about);
   });
 
   it("limits OpenRouter candidates to model card content", () => {
