@@ -145,7 +145,19 @@ export function createPageController(doc: Document, dependencies: PageController
   const failedBlockIds = new Set<string>();
   const queuedBatches: QueuedBatch[] = [];
   const translationMemory = new Map<string, string>();
+  const renderedMemoryBlockIds = new Map<string, string>();
   const inFlightSignatures = new Set<string>();
+
+  function removeStaleRenderedTranslationForMemoryKey(candidate: CandidateBlock) {
+    const memoryKey = getCandidateMemoryKey(candidate);
+    const renderedBlockId = renderedMemoryBlockIds.get(memoryKey);
+
+    if (renderedBlockId && renderedBlockId !== candidate.blockId) {
+      removeRenderedTranslationBlock(doc, renderedBlockId);
+    }
+
+    renderedMemoryBlockIds.set(memoryKey, candidate.blockId);
+  }
 
   async function syncPageState() {
     updateStatusPill(
@@ -227,6 +239,7 @@ export function createPageController(doc: Document, dependencies: PageController
         continue;
       }
 
+      removeStaleRenderedTranslationForMemoryKey(candidate);
       renderTranslationBelow(candidate.element, {
         blockId: candidate.blockId,
         translationText,
@@ -306,6 +319,7 @@ export function createPageController(doc: Document, dependencies: PageController
         continue;
       }
 
+      removeStaleRenderedTranslationForMemoryKey(candidate);
       renderTranslationBelow(candidate.element, {
         blockId: candidate.blockId,
         translationText: cachedTranslation,
@@ -418,6 +432,7 @@ export function createPageController(doc: Document, dependencies: PageController
       failedBlockIds.clear();
       queuedBatches.length = 0;
       translationMemory.clear();
+      renderedMemoryBlockIds.clear();
       inFlightSignatures.clear();
       observerCoordinator.disconnect();
       removeRenderedTranslations(doc);

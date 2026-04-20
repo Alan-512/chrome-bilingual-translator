@@ -361,6 +361,71 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("replaces stale rendered translations when virtualized content rerenders with the same adapter memory key", async () => {
+    let mutationCallback: (() => void) | undefined;
+    const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    window.history.replaceState({}, "", "/models");
+    document.body.innerHTML = `
+      <main>
+        <ul>
+          <li style="position: absolute; height: 120px; transform: translateY(0px);">
+            <article class="model-card">
+              <div data-testid="model-list-item">
+                <a href="/openai/gpt-4o-mini-tts-2025-12-15">
+                  <span>OpenAI: GPT-4o Mini TTS</span>
+                </a>
+                <a href="/openai/gpt-4o-mini-tts-2025-12-15">
+                  GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.
+                </a>
+              </div>
+            </article>
+          </li>
+        </ul>
+      </main>
+    `;
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          mutationCallback = callbacks.onMutation;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    await controller.activate();
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(2);
+
+    const modelListItem = document.querySelector("[data-testid='model-list-item']") as HTMLElement;
+    modelListItem.innerHTML = `
+      <a href="/openai/gpt-4o-mini-tts-2025-12-15">
+        <span>OpenAI: GPT-4o Mini TTS</span>
+      </a>
+      <a href="/openai/gpt-4o-mini-tts-2025-12-15">
+        GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.
+      </a>
+    `;
+
+    mutationCallback?.();
+    await settlePromises();
+
+    const translatedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(translatedBlocks).toHaveLength(2);
+    expect(translatedBlocks.map((node) => node.textContent)).toEqual([
+      "ZH:GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.",
+      "ZH:OpenAI: GPT-4o Mini TTS"
+    ]);
+    await controller.deactivate();
+  });
+
   it("does not queue the same visible content twice while its first request is still pending", async () => {
     let mutationCallback: (() => void) | undefined;
     let resolveTranslations: ((value: Record<string, string>) => void) | undefined;
