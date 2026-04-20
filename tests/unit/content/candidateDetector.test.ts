@@ -216,4 +216,39 @@ describe("collectCandidateBlocks", () => {
       "Gemini Embedding 2 Preview is Google's first multimodal embedding model."
     ]);
   });
+
+  it("limits Product Hunt candidates to the main product content area", () => {
+    document.body.innerHTML = `
+      <main>
+        <section>
+          <p>Launching Today</p>
+        </section>
+        <article data-producthunt-main>
+          <h1>Build Check (for Outsiders)</h1>
+          <p>Is your app idea actually worth building?</p>
+          <p>A free quiz for outsiders and vibe coders.</p>
+        </article>
+        <aside>
+          <p>Company Info</p>
+          <p>Forum</p>
+        </aside>
+      </main>
+    `;
+
+    const root = {
+      ownerDocument: {
+        ...document,
+        location: new URL("https://www.producthunt.com/products/build-check")
+      },
+      querySelectorAll: document.querySelectorAll.bind(document)
+    } as ParentNode;
+
+    const blocks = collectCandidateBlocks(root);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Build Check (for Outsiders)",
+      "Is your app idea actually worth building?",
+      "A free quiz for outsiders and vibe coders."
+    ]);
+  });
 });
