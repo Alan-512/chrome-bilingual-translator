@@ -3,6 +3,35 @@ export type PageClassification = {
   surface: "listing" | "detail" | "repo-home" | "repo-subpage" | "product-home" | "generic";
 };
 
+function looksLikeGitHubDocument(doc: Document): boolean {
+  if (typeof doc.querySelector !== "function") {
+    return false;
+  }
+
+  return (
+    doc.querySelector("#readme, .markdown-body, [itemprop='about'], [data-testid='repository-about']") !== null
+  );
+}
+
+function looksLikeOpenRouterDocument(doc: Document): boolean {
+  if (typeof doc.querySelector !== "function") {
+    return false;
+  }
+
+  return doc.querySelector(".model-card, [data-testid='model-card'], [data-or-route='model-card']") !== null;
+}
+
+function looksLikeProductHuntDocument(doc: Document): boolean {
+  if (typeof doc.querySelector !== "function") {
+    return false;
+  }
+
+  return (
+    doc.querySelector("[data-producthunt-main], main article, [data-test='product-main'], [data-sentry-component='ProductPage']") !==
+    null
+  );
+}
+
 export function classifyPage(doc: Document): PageClassification {
   const host = doc.location?.hostname ?? "";
   const pathname = doc.location?.pathname ?? "";
@@ -23,7 +52,7 @@ export function classifyPage(doc: Document): PageClassification {
     };
   }
 
-  if (/(\.|^)github\.com$/i.test(host)) {
+  if (/(\.|^)github\.com$/i.test(host) || looksLikeGitHubDocument(doc)) {
     const pathSegments = pathname.split("/").filter(Boolean);
 
     if (pathSegments.length === 2) {
@@ -42,18 +71,18 @@ export function classifyPage(doc: Document): PageClassification {
 
     return {
       site: "github",
-      surface: "generic"
+      surface: "repo-home"
     };
   }
 
-  if (/(\.|^)openrouter\.ai$/i.test(host)) {
+  if (/(\.|^)openrouter\.ai$/i.test(host) || looksLikeOpenRouterDocument(doc)) {
     return {
       site: "openrouter",
       surface: "listing"
     };
   }
 
-  if (/(\.|^)producthunt\.com$/i.test(host)) {
+  if (/(\.|^)producthunt\.com$/i.test(host) || looksLikeProductHuntDocument(doc)) {
     if (/^\/products\/[^/]+/.test(pathname) || /^\/posts\/[^/]+/.test(pathname)) {
       return {
         site: "producthunt",
@@ -63,7 +92,7 @@ export function classifyPage(doc: Document): PageClassification {
 
     return {
       site: "producthunt",
-      surface: "listing"
+      surface: looksLikeProductHuntDocument(doc) ? "detail" : "listing"
     };
   }
 

@@ -59,4 +59,54 @@ describe("classifyPage", () => {
       surface: "detail"
     });
   });
+
+  it("classifies GitHub-like pages from README/about DOM signatures even on localhost", () => {
+    window.history.replaceState({}, "", "/github-repo");
+    document.body.innerHTML = `
+      <main>
+        <section id="readme">
+          <article class="markdown-body">
+            <h1>Claude Code Game Studios</h1>
+          </article>
+        </section>
+      </main>
+    `;
+
+    expect(classifyPage(document)).toEqual({
+      site: "github",
+      surface: "repo-home"
+    });
+  });
+
+  it("classifies OpenRouter-like pages from model card DOM signatures even on localhost", () => {
+    window.history.replaceState({}, "", "/openrouter-models");
+    document.body.innerHTML = `
+      <main>
+        <article class="model-card">
+          <h2>OpenAI: GPT-4o Mini TTS</h2>
+        </article>
+      </main>
+    `;
+
+    expect(classifyPage(document)).toEqual({
+      site: "openrouter",
+      surface: "listing"
+    });
+  });
+
+  it("classifies Product Hunt-like pages from main content DOM signatures even on localhost", () => {
+    window.history.replaceState({}, "", "/producthunt-detail");
+    document.body.innerHTML = `
+      <main>
+        <article data-producthunt-main>
+          <h1>Build Check (for Outsiders)</h1>
+        </article>
+      </main>
+    `;
+
+    expect(classifyPage(document)).toEqual({
+      site: "producthunt",
+      surface: "detail"
+    });
+  });
 });
