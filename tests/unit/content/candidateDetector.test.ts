@@ -244,11 +244,16 @@ describe("collectCandidateBlocks", () => {
     } as ParentNode;
 
     const blocks = collectCandidateBlocks(root);
+    const productMain = document.querySelector("[data-producthunt-main]") as HTMLElement;
+    const firstSummaryParagraph = productMain.querySelector("p") as HTMLParagraphElement;
 
     expect(blocks.map((block) => block.sourceText)).toEqual([
       "Build Check (for Outsiders)",
       "Is your app idea actually worth building?",
       "A free quiz for outsiders and vibe coders."
     ]);
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstSummaryParagraph);
+    expect(blocks[0]?.renderHint?.expansionRoot).toBe(productMain);
+    expect(blocks[1]?.renderHint?.expansionRoot).toBe(productMain);
   });
 });

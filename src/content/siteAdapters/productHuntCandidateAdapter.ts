@@ -31,9 +31,16 @@ export function collectProductHuntCandidateBlock(
     return null;
   }
 
+  const firstSummaryParagraph =
+    element.tagName === "H1" ? allowedRoot.querySelector<HTMLElement>("p, li, blockquote") ?? undefined : undefined;
+
   return {
     blockId: helpers.getStableBlockId(element),
     element,
-    sourceText
+    sourceText,
+    renderHint: {
+      anchorElement: firstSummaryParagraph,
+      expansionRoot: allowedRoot
+    }
   };
 }
