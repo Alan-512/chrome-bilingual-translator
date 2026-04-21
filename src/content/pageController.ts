@@ -160,6 +160,24 @@ export function createPageController(doc: Document, dependencies: PageController
     renderedMemoryBlockIds.set(memoryKey, candidate.blockId);
   }
 
+  function hasRenderedTranslationBlock(blockId: string) {
+    return doc.querySelector(`[data-bilingual-translator-owned='true'][data-bilingual-translator-block-id='${blockId}']`) !== null;
+  }
+
+  function isCandidateSatisfied(candidate: CandidateBlock) {
+    const currentState = stateStore.get(candidate.blockId);
+
+    if (currentState === "queued" || currentState === "pending") {
+      return true;
+    }
+
+    if (currentState === "translated") {
+      return hasRenderedTranslationBlock(candidate.blockId);
+    }
+
+    return false;
+  }
+
   async function syncPageState() {
     updateStatusPill(
       statusPill,
@@ -192,8 +210,7 @@ export function createPageController(doc: Document, dependencies: PageController
     const targetSet = targetElements ? new Set(targetElements) : null;
 
     return collectCandidateBlocks(doc).filter((candidate) => {
-      const currentState = stateStore.get(candidate.blockId);
-      if (currentState === "queued" || currentState === "pending" || currentState === "translated") {
+      if (isCandidateSatisfied(candidate)) {
         return false;
       }
 
@@ -414,7 +431,7 @@ export function createPageController(doc: Document, dependencies: PageController
             },
             onMutation: () => {
               const nextCandidates = collectCandidateBlocks(doc)
-                .filter((candidate) => !stateStore.has(candidate.blockId))
+                .filter((candidate) => !isCandidateSatisfied(candidate))
                 .map((candidate) => candidate.element);
               observerCoordinator.observeCandidates(nextCandidates);
               const readyElements = nextCandidates.filter((element) => isElementReadyForTranslation(element));
@@ -442,7 +459,7 @@ export function createPageController(doc: Document, dependencies: PageController
       }
 
       const nextCandidates = collectCandidateBlocks(doc)
-        .filter((candidate) => !stateStore.has(candidate.blockId))
+        .filter((candidate) => !isCandidateSatisfied(candidate))
         .map((candidate) => candidate.element);
       observerCoordinator.observeCandidates(nextCandidates);
       await processCandidates();

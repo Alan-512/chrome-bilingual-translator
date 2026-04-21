@@ -413,6 +413,40 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("re-hydrates translations when the host removes rendered translation nodes but keeps the same source elements", async () => {
+    let mutationCallback: (() => void) | undefined;
+    const requestTranslations = vi.fn(async (blocks) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          mutationCallback = callbacks.onMutation;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    await controller.activate();
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(2);
+
+    document.querySelectorAll("[data-bilingual-translator-owned='true']").forEach((element) => element.remove());
+
+    mutationCallback?.();
+    await settlePromises();
+
+    const translatedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(translatedBlocks).toHaveLength(2);
+    expect(translatedBlocks.every((node) => node.textContent?.includes("ZH:"))).toBe(true);
+    await controller.deactivate();
+  });
+
   it("re-hydrates adapter-backed content after rerender even when the DOM tag changes", async () => {
     let mutationCallback: (() => void) | undefined;
     const requestTranslations = vi.fn(async (blocks) =>
