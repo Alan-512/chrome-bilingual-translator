@@ -56,7 +56,16 @@ function bootstrapContentRuntime() {
     }
   });
 
-  const runtimeListener = (message: { type?: string; tabId?: number }) => {
+  const runtimeListener = (
+    message: { type?: string; tabId?: number },
+    _sender: chrome.runtime.MessageSender,
+    sendResponse: (response?: { ok: boolean }) => void
+  ) => {
+    if (message?.type === "runtime/ping") {
+      sendResponse({ ok: true });
+      return;
+    }
+
     if (message?.type === "page/activate" && typeof message.tabId === "number") {
       currentTabId = message.tabId;
       debugMode = Boolean((message as { debugMode?: boolean }).debugMode);

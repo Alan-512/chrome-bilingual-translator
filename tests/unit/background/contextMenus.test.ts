@@ -15,8 +15,8 @@ describe("context menu labeling", () => {
     expect(getToggleMenuTitle({ enabled: false })).toBe("Translate current webpage");
   });
 
-  it("uses the restore label for tabs with active translation", () => {
-    expect(getToggleMenuTitle({ enabled: true })).toBe("Show original text");
+  it("keeps the translate label even for tabs with active translation", () => {
+    expect(getToggleMenuTitle({ enabled: true })).toBe("Translate current webpage");
   });
 });
 
@@ -26,7 +26,7 @@ describe("buildToggleMenuItem", () => {
 
     expect(menuItem).toEqual({
       id: MENU_ID_TOGGLE_TRANSLATION,
-      title: "Show original text",
+      title: "Translate current webpage",
       contexts: ["page"]
     });
   });
@@ -70,7 +70,7 @@ describe("context menu api integration", () => {
       {
         id: MENU_ID_TOGGLE_TRANSLATION,
         update: {
-          title: "Show original text"
+          title: "Translate current webpage"
         }
       }
     ]);

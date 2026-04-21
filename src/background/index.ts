@@ -32,10 +32,20 @@ async function ensureMenuRegistered() {
 }
 
 async function sendLifecycleMessage(tabId: number, type: "page/activate" | "page/deactivate") {
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: ["dist/content.js"]
-  });
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: "runtime/ping"
+    });
+
+    if (!response?.ok) {
+      throw new Error("Content runtime did not acknowledge ping.");
+    }
+  } catch {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["dist/content.js"]
+    });
+  }
 
   const config = type === "page/activate" ? await loadExtensionConfig(localStorageArea) : null;
   await chrome.tabs.sendMessage(tabId, {
@@ -91,8 +101,7 @@ async function bootstrap() {
     }
 
     void (async () => {
-      const session = await tabSessionStore.get(tab.id);
-      await sendLifecycleMessage(tab.id, session.enabled ? "page/deactivate" : "page/activate");
+      await sendLifecycleMessage(tab.id, "page/activate");
     })();
   });
 
