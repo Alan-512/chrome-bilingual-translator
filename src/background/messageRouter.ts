@@ -14,6 +14,7 @@ type BackgroundMessageRouterDependencies = {
   translator: TranslatorClient;
   requestApiPermission: ApiOriginPermissionRequester;
   tabSessionStore: SessionStorageTabSessionStore;
+  debugLog?: (event: string, detail?: Record<string, unknown>) => void | Promise<void>;
 };
 
 type MessageSenderLike = {
@@ -26,6 +27,12 @@ async function handleTranslationRequest(
   message: TranslationRequestMessage,
   dependencies: BackgroundMessageRouterDependencies
 ) {
+  await dependencies.debugLog?.("translation/request:received", {
+    tabId: message.tabId,
+    blockCount: message.blocks.length,
+    blockIds: message.blocks.map((block) => block.blockId)
+  });
+
   const config = await dependencies.loadConfig();
   const missingFields = getMissingConfigFields(config);
 
@@ -50,6 +57,11 @@ async function handleTranslationRequest(
     blocks: message.blocks
   });
 
+  await dependencies.debugLog?.("translation/request:succeeded", {
+    tabId: message.tabId,
+    translatedBlockCount: Object.keys(translations).length
+  });
+
   const previousSession = await dependencies.tabSessionStore.get(message.tabId);
   await dependencies.tabSessionStore.set(message.tabId, {
     enabled: true,
@@ -64,6 +76,12 @@ async function handleTranslationRequest(
 }
 
 async function handleApiTest(message: ApiTestMessage, dependencies: BackgroundMessageRouterDependencies) {
+  await dependencies.debugLog?.("api/test:received", {
+    provider: message.config.provider,
+    model: message.config.model,
+    apiBaseUrl: message.config.apiBaseUrl
+  });
+
   const config = buildPersistedConfigRecord(message.config);
   const missingFields = getMissingConfigFields(config);
 
@@ -85,12 +103,22 @@ async function handleApiTest(message: ApiTestMessage, dependencies: BackgroundMe
 
   await dependencies.translator.testConnection({ config });
 
+  await dependencies.debugLog?.("api/test:succeeded", {
+    provider: config.provider,
+    model: config.model
+  });
+
   return { ok: true as const };
 }
 
 export function createBackgroundMessageRouter(dependencies: BackgroundMessageRouterDependencies) {
   return {
     async handleMessage(message: RuntimeMessage, _sender: MessageSenderLike) {
+      await dependencies.debugLog?.("runtime/message:received", {
+        type: message.type,
+        tabId: "tabId" in message ? message.tabId : undefined
+      });
+
       if (message.type === "api/test") {
         return handleApiTest(message, dependencies);
       }
@@ -100,6 +128,13 @@ export function createBackgroundMessageRouter(dependencies: BackgroundMessageRou
       }
 
       if (message.type === "page/status") {
+        await dependencies.debugLog?.("page/status:received", {
+          tabId: message.tabId,
+          enabled: message.enabled,
+          translatedBlockCount: message.translatedBlockCount,
+          pendingRequestCount: message.pendingRequestCount
+        });
+
         await dependencies.tabSessionStore.set(message.tabId, {
           enabled: message.enabled,
           translatedBlockCount: message.translatedBlockCount,

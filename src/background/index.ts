@@ -19,11 +19,23 @@ const translator = createTranslatorClient({
   fetchImpl: (...args) => fetch(...args),
   cache: new PersistentTranslationCache(localStorageArea)
 });
+
+async function debugLog(event: string, detail?: Record<string, unknown>) {
+  const config = await loadExtensionConfig(localStorageArea);
+
+  if (!config.debugMode) {
+    return;
+  }
+
+  console.debug("[bilingual:bg]", event, detail ?? {});
+}
+
 const messageRouter = createBackgroundMessageRouter({
   loadConfig: async () => loadExtensionConfig(localStorageArea),
   translator,
   requestApiPermission: createChromeApiOriginPermissionRequester(),
-  tabSessionStore
+  tabSessionStore,
+  debugLog
 });
 
 async function ensureMenuRegistered() {
@@ -32,6 +44,11 @@ async function ensureMenuRegistered() {
 }
 
 async function sendLifecycleMessage(tabId: number, type: "page/activate" | "page/deactivate") {
+  await debugLog("lifecycle:dispatch:start", {
+    tabId,
+    type
+  });
+
   try {
     const response = await chrome.tabs.sendMessage(tabId, {
       type: "runtime/ping"
@@ -40,10 +57,20 @@ async function sendLifecycleMessage(tabId: number, type: "page/activate" | "page
     if (!response?.ok) {
       throw new Error("Content runtime did not acknowledge ping.");
     }
+
+    await debugLog("lifecycle:dispatch:reused-runtime", {
+      tabId,
+      type
+    });
   } catch {
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ["dist/content.js"]
+    });
+
+    await debugLog("lifecycle:dispatch:injected-runtime", {
+      tabId,
+      type
     });
   }
 
@@ -52,6 +79,12 @@ async function sendLifecycleMessage(tabId: number, type: "page/activate" | "page
     type,
     tabId,
     ...(type === "page/activate" ? { debugMode: config?.debugMode ?? false } : {})
+  });
+
+  await debugLog("lifecycle:dispatch:sent", {
+    tabId,
+    type,
+    debugMode: config?.debugMode ?? false
   });
 }
 
@@ -76,10 +109,16 @@ async function bootstrap() {
     }
 
     void tabSessionStore.clear(tabId);
+    void debugLog("tab:cleared-on-loading", {
+      tabId
+    });
   });
 
   chrome.tabs.onRemoved.addListener((tabId) => {
     void tabSessionStore.clear(tabId);
+    void debugLog("tab:cleared-on-removed", {
+      tabId
+    });
   });
 
   registerOptionalContextMenuShownListener(chrome.contextMenus, (_info, tab) => {
@@ -90,6 +129,12 @@ async function bootstrap() {
 
     void (async () => {
       const session = await tabSessionStore.get(tabId);
+      await debugLog("context-menu:shown", {
+        tabId,
+        enabled: session.enabled,
+        translatedBlockCount: session.translatedBlockCount,
+        pendingRequestCount: session.pendingRequestCount
+      });
       await refreshToggleMenu(chrome.contextMenus, session);
       chrome.contextMenus.refresh?.();
     })();
@@ -101,6 +146,9 @@ async function bootstrap() {
     }
 
     void (async () => {
+      await debugLog("context-menu:clicked", {
+        tabId: tab.id
+      });
       await sendLifecycleMessage(tab.id, "page/activate");
     })();
   });
@@ -111,6 +159,10 @@ async function bootstrap() {
         const response = await messageRouter.handleMessage(message, sender);
         sendResponse(response);
       } catch (error) {
+        await debugLog("runtime/message:error", {
+          type: typeof message?.type === "string" ? message.type : "unknown",
+          error: error instanceof Error ? error.message : "Unknown background error"
+        });
         sendResponse({
           ok: false,
           error: error instanceof Error ? error.message : "Unknown background error"

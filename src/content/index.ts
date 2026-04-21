@@ -62,6 +62,12 @@ function bootstrapContentRuntime() {
     sendResponse: (response?: { ok: boolean }) => void
   ) => {
     if (message?.type === "runtime/ping") {
+      if (debugMode) {
+        console.debug("[bilingual]", "runtime/ping", {
+          href: window.location.href,
+          tabId: currentTabId
+        });
+      }
       sendResponse({ ok: true });
       return;
     }
@@ -69,11 +75,23 @@ function bootstrapContentRuntime() {
     if (message?.type === "page/activate" && typeof message.tabId === "number") {
       currentTabId = message.tabId;
       debugMode = Boolean((message as { debugMode?: boolean }).debugMode);
+      if (debugMode) {
+        console.debug("[bilingual]", "page/activate", {
+          href: window.location.href,
+          tabId: currentTabId
+        });
+      }
       void controller.activate();
     }
 
     if (message?.type === "page/deactivate" && typeof message.tabId === "number") {
       currentTabId = message.tabId;
+      if (debugMode) {
+        console.debug("[bilingual]", "page/deactivate", {
+          href: window.location.href,
+          tabId: currentTabId
+        });
+      }
       debugMode = false;
       void controller.deactivate();
     }
