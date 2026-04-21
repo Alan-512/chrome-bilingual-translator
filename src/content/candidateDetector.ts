@@ -84,6 +84,17 @@ function normalizeText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function containsEquivalentText(haystack: string, needle: string): boolean {
+  const normalizedHaystack = normalizeText(haystack);
+  const normalizedNeedle = normalizeText(needle);
+
+  if (!normalizedHaystack || !normalizedNeedle) {
+    return false;
+  }
+
+  return normalizedHaystack.includes(normalizedNeedle);
+}
+
 function collectTableText(tableRoot: HTMLElement): string {
   const rows = Array.from(
     tableRoot.querySelectorAll<HTMLElement>(
@@ -319,6 +330,21 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
     if (shouldMergeGenericFallbackForPage(page)) {
       const mergedGenericCandidates = filteredGenericCandidates.filter((genericCandidate) => {
         if (page.site === "reddit" && page.surface === "detail" && genericCandidate.element.closest("shreddit-post") !== null) {
+          return false;
+        }
+
+        if (
+          page.site === "reddit" &&
+          page.surface === "detail" &&
+          siteCandidates.some(
+            (siteCandidate) =>
+              containsEquivalentText(genericCandidate.sourceText, siteCandidate.sourceText) &&
+              (
+                siteCandidate.sourceText.length >= 24 ||
+                normalizeText(genericCandidate.sourceText) === normalizeText(siteCandidate.sourceText)
+              )
+          )
+        ) {
           return false;
         }
 

@@ -423,6 +423,38 @@ describe("collectCandidateBlocks", () => {
     expect(blocks.map((block) => block.sourceText)).toEqual(["Detail title", "Original post paragraph."]);
   });
 
+  it("does not merge Reddit detail generic fallback blocks that duplicate post title or body content outside the main post container", () => {
+    window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a slot="title">Detail title</a>
+          <div slot="text-body">
+            <p>Original post paragraph.</p>
+            <p>Second post paragraph.</p>
+          </div>
+        </shreddit-post>
+        <section class="duplicate-summary">
+          <p>Detail title</p>
+          <p>Original post paragraph.</p>
+          <p>Second post paragraph.</p>
+        </section>
+        <section>
+          <p>Nested reply that lives outside the main shreddit-post container.</p>
+        </section>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Detail title",
+      "Original post paragraph.",
+      "Second post paragraph.",
+      "Nested reply that lives outside the main shreddit-post container."
+    ]);
+  });
+
   it("limits GitHub repository home candidates to README and about content", () => {
     document.body.innerHTML = `
       <main>
