@@ -378,7 +378,7 @@ describe("collectCandidateBlocks", () => {
     );
   });
 
-  it("merges generic fallback content on Reddit detail pages without reintroducing duplicates inside the main post card", () => {
+  it("does not merge generic fallback content on Reddit detail pages", () => {
     window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
     document.body.innerHTML = `
       <main>
@@ -396,11 +396,7 @@ describe("collectCandidateBlocks", () => {
 
     const blocks = collectCandidateBlocks(document);
 
-    expect(blocks.map((block) => block.sourceText)).toEqual([
-      "Detail title",
-      "Original post paragraph.",
-      "Nested reply that lives outside the main shreddit-post container."
-    ]);
+    expect(blocks.map((block) => block.sourceText)).toEqual(["Detail title", "Original post paragraph."]);
   });
 
   it("does not merge generic fallback candidates that still live inside the Reddit main post container", () => {
@@ -423,7 +419,7 @@ describe("collectCandidateBlocks", () => {
     expect(blocks.map((block) => block.sourceText)).toEqual(["Detail title", "Original post paragraph."]);
   });
 
-  it("does not merge Reddit detail generic fallback blocks that duplicate post title or body content outside the main post container", () => {
+  it("ignores repeated Reddit detail fallback blocks outside the main post container", () => {
     window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
     document.body.innerHTML = `
       <main>
@@ -450,8 +446,7 @@ describe("collectCandidateBlocks", () => {
     expect(blocks.map((block) => block.sourceText)).toEqual([
       "Detail title",
       "Original post paragraph.",
-      "Second post paragraph.",
-      "Nested reply that lives outside the main shreddit-post container."
+      "Second post paragraph."
     ]);
   });
 

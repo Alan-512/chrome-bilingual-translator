@@ -27,7 +27,7 @@ async function debugLog(event: string, detail?: Record<string, unknown>) {
     return;
   }
 
-  console.debug("[bilingual:bg]", event, detail ?? {});
+  console.log("[bilingual:bg]", event, detail ?? {});
 }
 
 const messageRouter = createBackgroundMessageRouter({

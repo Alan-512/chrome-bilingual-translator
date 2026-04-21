@@ -20,7 +20,7 @@ type SiteAdapter = {
 };
 
 const REDDIT_ADAPTER: SiteAdapter = {
-  genericFallbackMode: (page) => (page.surface === "detail" ? "merge" : "when-empty"),
+  genericFallbackMode: (page) => (page.surface === "detail" ? "never" : "when-empty"),
   collectCandidateBlock: collectRedditCandidateBlock
 };
 

@@ -52,7 +52,7 @@ function bootstrapContentRuntime() {
         return;
       }
 
-      console.debug("[bilingual]", event, detail ?? {});
+      console.log("[bilingual]", event, detail ?? {});
     }
   });
 
@@ -63,7 +63,7 @@ function bootstrapContentRuntime() {
   ) => {
     if (message?.type === "runtime/ping") {
       if (debugMode) {
-        console.debug("[bilingual]", "runtime/ping", {
+        console.log("[bilingual]", "runtime/ping", {
           href: window.location.href,
           tabId: currentTabId
         });
@@ -76,7 +76,7 @@ function bootstrapContentRuntime() {
       currentTabId = message.tabId;
       debugMode = Boolean((message as { debugMode?: boolean }).debugMode);
       if (debugMode) {
-        console.debug("[bilingual]", "page/activate", {
+        console.log("[bilingual]", "page/activate", {
           href: window.location.href,
           tabId: currentTabId
         });
@@ -87,7 +87,7 @@ function bootstrapContentRuntime() {
     if (message?.type === "page/deactivate" && typeof message.tabId === "number") {
       currentTabId = message.tabId;
       if (debugMode) {
-        console.debug("[bilingual]", "page/deactivate", {
+        console.log("[bilingual]", "page/deactivate", {
           href: window.location.href,
           tabId: currentTabId
         });

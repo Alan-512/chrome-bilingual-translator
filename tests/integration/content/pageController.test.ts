@@ -328,7 +328,7 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
-  it("translates nested replies only after a previously hidden thread is expanded and the page rescans", async () => {
+  it("translates Reddit nested replies only after a previously hidden comment thread is expanded and the page rescans", async () => {
     const requestTranslations = vi.fn(async (blocks) =>
       Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
     );
@@ -342,9 +342,13 @@ describe("pageController", () => {
             <p>Original post paragraph.</p>
           </div>
         </shreddit-post>
-        <section id="reply-thread" hidden aria-hidden="true">
-          <p id="nested-reply">A nested reply that is loaded after the thread is expanded.</p>
-        </section>
+        <shreddit-comment thingid="t1_nested" id="reply-thread" aria-expanded="false">
+          <div hidden aria-hidden="true">
+            <div class="md" slot="comment">
+              <p id="nested-reply">A nested reply that is loaded after the thread is expanded.</p>
+            </div>
+          </div>
+        </shreddit-comment>
       </main>
     `;
 
@@ -360,10 +364,12 @@ describe("pageController", () => {
     );
 
     const replyThread = document.getElementById("reply-thread") as HTMLElement;
+    const hiddenWrapper = replyThread.querySelector("div[hidden]") as HTMLElement;
     const nestedReply = document.getElementById("nested-reply") as HTMLElement;
-    replyThread.hidden = false;
-    replyThread.removeAttribute("hidden");
-    replyThread.removeAttribute("aria-hidden");
+    hiddenWrapper.hidden = false;
+    hiddenWrapper.removeAttribute("hidden");
+    hiddenWrapper.removeAttribute("aria-hidden");
+    replyThread.setAttribute("aria-expanded", "true");
 
     await controller.rescan();
 
