@@ -327,7 +327,7 @@ describe("collectCandidateBlocks", () => {
 
     const blocks = collectCandidateBlocks(document);
     const postCard = document.querySelector("shreddit-post") as HTMLElement;
-    const firstParagraph = postCard.querySelector("p") as HTMLParagraphElement;
+    const titleAnchor = postCard.querySelector("[slot='title']") as HTMLElement;
 
     expect(blocks.map((block) => ({ slot: block.element.getAttribute("slot"), text: block.sourceText }))).toEqual([
       {
@@ -351,7 +351,7 @@ describe("collectCandidateBlocks", () => {
         text: "Codex with the resets I am loving it regardless what it is."
       }
     ]);
-    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstParagraph);
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(titleAnchor);
     expect(blocks[0]?.rehydrateKey).toBe(
       "reddit|detail|post-title|I found out why ChatGPT gets slower the longer you use it"
     );
@@ -401,6 +401,26 @@ describe("collectCandidateBlocks", () => {
       "Original post paragraph.",
       "Nested reply that lives outside the main shreddit-post container."
     ]);
+  });
+
+  it("does not merge generic fallback candidates that still live inside the Reddit main post container", () => {
+    window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a slot="title">Detail title</a>
+          <div class="outer-copy">
+            <div slot="text-body">
+              <p>Original post paragraph.</p>
+            </div>
+          </div>
+        </shreddit-post>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual(["Detail title", "Original post paragraph."]);
   });
 
   it("limits GitHub repository home candidates to README and about content", () => {

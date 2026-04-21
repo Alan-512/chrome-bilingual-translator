@@ -318,6 +318,10 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
   if (matchedSiteCandidate) {
     if (shouldMergeGenericFallbackForPage(page)) {
       const mergedGenericCandidates = filteredGenericCandidates.filter((genericCandidate) => {
+        if (page.site === "reddit" && page.surface === "detail" && genericCandidate.element.closest("shreddit-post") !== null) {
+          return false;
+        }
+
         return siteCandidates.every((siteCandidate) => {
           if (siteCandidate.blockId === genericCandidate.blockId) {
             return false;

@@ -180,7 +180,7 @@ export function collectRedditCandidateBlock(
       sourceText,
       rehydrateKey: buildRedditRehydrateKey(page, ["post-title", sourceText]),
       renderHint: {
-        anchorElement: bodyElement?.querySelector<HTMLElement>("p, li, blockquote") ?? undefined,
+        anchorElement: titleElement,
         expansionRoot: feedCard
       }
     };

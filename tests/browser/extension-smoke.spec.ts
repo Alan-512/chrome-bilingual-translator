@@ -485,7 +485,7 @@ test("renders Reddit listing title and preview translations under their own sour
   }
 });
 
-test("keeps Reddit detail translations segmented and anchors the title translation below the first paragraph", async () => {
+test("keeps Reddit detail translations segmented and anchors the title translation below the title", async () => {
   const mockServer = await startMockTranslationServer();
   const userDataDir = test.info().outputPath("reddit-detail-user-data");
   const { context, background } = await launchExtensionContext(userDataDir);
@@ -500,7 +500,8 @@ test("keeps Reddit detail translations segmented and anchors the title translati
 
     await injectAndActivate(background, tab.id);
 
-    await expect(page.locator("[slot='title'] + [data-bilingual-translator-owned='true']")).toHaveCount(0);
+    await expect(page.locator("[slot='title'] + [data-bilingual-translator-owned='true']")).toHaveCount(1);
+    await expect(page.locator("[slot='title'] + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
     await expect(page.locator("p + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
     await expect(page.locator("shreddit-comment[thingid='t1_alpha'] p + [data-bilingual-translator-owned='true']")).toHaveCount(1);
     await expect(page.locator("shreddit-comment[thingid='t1_beta'] p + [data-bilingual-translator-owned='true']")).toHaveCount(1);
