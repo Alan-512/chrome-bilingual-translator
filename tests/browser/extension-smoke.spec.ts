@@ -30,9 +30,12 @@ function startMockTranslationServer() {
   const fixtureRoutes = new Map<string, string>([
     ["/article", "article.html"],
     ["/article-layouts", "article-layouts.html"],
+    ["/commerce-specs", "commerce-specs.html"],
     ["/docs-interactions", "docs-interactions.html"],
     ["/social-feed", "social-feed.html"],
+    ["/social-nested-feed", "social-nested-feed.html"],
     ["/search?q=antigravity", "google-serp.html"],
+    ["/search?q=wireless+headphones&tbm=shop", "google-shopping.html"],
     ["/r/vibecoding/", "reddit-listing.html"],
     ["/r/ChatGPT/comments/abc123/example-post/", "reddit-detail.html"],
     ["/owner/repo", "github-repo.html"],
@@ -253,6 +256,36 @@ test("handles Google search result titles, snippets, videos, questions, and know
   }
 });
 
+test("handles Google Shopping waterfall cards as title, description, and price blocks", async () => {
+  const mockServer = await startMockTranslationServer();
+  const userDataDir = test.info().outputPath("google-shopping-user-data");
+  const { context, background } = await launchExtensionContext(userDataDir);
+
+  try {
+    await configureMockTranslator(background, `${mockServer.origin}/v1/chat/completions`);
+
+    const page = await context.newPage();
+    await page.goto(buildFixtureUrl(mockServer.port, "/search?q=wireless+headphones&tbm=shop"));
+    await page.bringToFront();
+    const [tab] = await background.evaluate(async () => chrome.tabs.query({ active: true, currentWindow: true }));
+
+    await injectAndActivate(background, tab.id);
+
+    await expect(page.locator("[data-shopping-result] [data-shopping-link] + [data-bilingual-translator-owned='true']").first()).toContainText(
+      "中文翻译"
+    );
+    await expect(
+      page.locator("[data-shopping-result] [data-shopping-description] + [data-bilingual-translator-owned='true']").first()
+    ).toContainText("中文翻译");
+    await expect(page.locator("[data-shopping-result] [data-shopping-price] + [data-bilingual-translator-owned='true']").first()).toContainText(
+      "中文翻译"
+    );
+  } finally {
+    await context.close();
+    await mockServer.close();
+  }
+});
+
 test("keeps generic docs tabs and accordion content scoped to visible panels only", async () => {
   const mockServer = await startMockTranslationServer();
   const userDataDir = test.info().outputPath("docs-interactions-user-data");
@@ -297,6 +330,58 @@ test("translates social-feed body, quote block, and media caption without touchi
     await expect(page.locator("#social-post blockquote + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
     await expect(page.locator("#social-post figcaption + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
     await expect(page.locator("#social-post footer [data-bilingual-translator-owned='true']")).toHaveCount(0);
+  } finally {
+    await context.close();
+    await mockServer.close();
+  }
+});
+
+test("keeps nested quote cards translated as separate blocks without touching action chrome", async () => {
+  const mockServer = await startMockTranslationServer();
+  const userDataDir = test.info().outputPath("social-nested-feed-user-data");
+  const { context, background } = await launchExtensionContext(userDataDir);
+
+  try {
+    await configureMockTranslator(background, `${mockServer.origin}/v1/chat/completions`);
+
+    const page = await context.newPage();
+    await page.goto(buildFixtureUrl(mockServer.port, "/social-nested-feed"));
+    await page.bringToFront();
+    const [tab] = await background.evaluate(async () => chrome.tabs.query({ active: true, currentWindow: true }));
+
+    await injectAndActivate(background, tab.id);
+
+    await expect(page.locator("#social-post p + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+    await expect(page.locator("#outer-quote + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
+    await page.locator("#inner-quote").scrollIntoViewIfNeeded();
+    await expect(
+      page.locator("#inner-quote + [data-bilingual-translator-owned='true'], #inner-quote [data-bilingual-translator-owned='true']").first()
+    ).toContainText("中文翻译");
+    await expect(page.locator("#social-post footer [data-bilingual-translator-owned='true']")).toHaveCount(0);
+  } finally {
+    await context.close();
+    await mockServer.close();
+  }
+});
+
+test("groups generic commerce specification tables, description lists, and key-value grids into stable translated blocks", async () => {
+  const mockServer = await startMockTranslationServer();
+  const userDataDir = test.info().outputPath("commerce-specs-user-data");
+  const { context, background } = await launchExtensionContext(userDataDir);
+
+  try {
+    await configureMockTranslator(background, `${mockServer.origin}/v1/chat/completions`);
+
+    const page = await context.newPage();
+    await page.goto(buildFixtureUrl(mockServer.port, "/commerce-specs"));
+    await page.bringToFront();
+    const [tab] = await background.evaluate(async () => chrome.tabs.query({ active: true, currentWindow: true }));
+
+    await injectAndActivate(background, tab.id);
+
+    await expect(page.locator("#spec-table + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
+    await expect(page.locator("#spec-list + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
+    await expect(page.locator("#spec-grid + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
   } finally {
     await context.close();
     await mockServer.close();

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Google Shopping Fixture</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #fff; color: #202124; }
+      .shopping-grid { max-width: 1180px; margin: 32px auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+      .shopping-card { border: 1px solid #e0e0e0; border-radius: 18px; padding: 16px; background: #fff; }
+      .price { color: #0f9d58; font-weight: 700; }
+      .merchant { color: #5f6368; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <main class="shopping-grid">
+      <article class="shopping-card" data-shopping-result>
+        <a href="/shopping/product-1" data-shopping-link>
+          <h3 role="heading" aria-level="3">NoiseCancel Max Wireless Headphones</h3>
+        </a>
+        <p data-shopping-description>Over-ear ANC headphones with 40-hour battery life and USB-C fast charge.</p>
+        <p class="price" data-shopping-price>$249.00</p>
+        <p class="merchant">Sold by AudioLab</p>
+      </article>
+      <article class="shopping-card" data-shopping-result>
+        <a href="/shopping/product-2" data-shopping-link>
+          <h3 role="heading" aria-level="3">StudioPods Pro Open-Ear Earbuds</h3>
+        </a>
+        <p data-shopping-description>Lightweight open-ear earbuds with multipoint Bluetooth and low latency mode.</p>
+        <p class="price" data-shopping-price>$179.00</p>
+        <p class="merchant">Sold by Sound Harbor</p>
+      </article>
+      <article class="shopping-card" data-shopping-result>
+        <a href="/shopping/product-3" data-shopping-link>
+          <h3 role="heading" aria-level="3">TravelDock GaN Charger 140W</h3>
+        </a>
+        <p data-shopping-description>Three-port travel charger with foldable prongs and dynamic power balancing.</p>
+        <p class="price" data-shopping-price>$89.00</p>
+        <p class="merchant">Sold by Volt Supply</p>
+      </article>
+    </main>
+  </body>
+</html>

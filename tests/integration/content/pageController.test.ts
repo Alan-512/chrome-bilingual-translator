@@ -942,6 +942,58 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("translates youtube-like lazy loaded comment replies when a thread appends them after the initial render", async () => {
+    let mutationCallback: (() => void) | undefined;
+    const requestTranslations = vi.fn(async (blocks) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    document.body.innerHTML = `
+      <main>
+        <ytd-comments>
+          <ytd-comment-thread-renderer id="thread-1">
+            <div id="top-comment">
+              <p>Top-level comment about the release notes.</p>
+            </div>
+            <div id="replies"></div>
+          </ytd-comment-thread-renderer>
+        </ytd-comments>
+      </main>
+    `;
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          mutationCallback = callbacks.onMutation;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    await controller.activate();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).toContain("ZH:Top-level comment about the release notes.");
+
+    document.getElementById("replies")!.innerHTML = `
+      <div class="reply">
+        <p>The lazily loaded reply should be translated after mutation processing.</p>
+      </div>
+    `;
+
+    mutationCallback?.();
+    await settlePromises();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(2);
+    expect(document.body.textContent).toContain(
+      "ZH:The lazily loaded reply should be translated after mutation processing."
+    );
+    await controller.deactivate();
+  });
+
   it("deactivates and removes injected translations", async () => {
     const controller = createPageController(document, {
       requestTranslations: async (blocks) =>

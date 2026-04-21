@@ -65,6 +65,102 @@ describe("collectCandidateBlocks", () => {
     ]);
   });
 
+  it("groups specification tables into one translatable block instead of translating each cell separately", () => {
+    document.body.innerHTML = `
+      <main>
+        <table>
+          <tbody>
+            <tr><th>Battery life</th><td>Up to 30 hours</td></tr>
+            <tr><th>Weight</th><td>245 g</td></tr>
+          </tbody>
+        </table>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual(["Battery life: Up to 30 hours\n\nWeight: 245 g"]);
+  });
+
+  it("groups description lists into one translatable block with key-value pairs preserved", () => {
+    document.body.innerHTML = `
+      <main>
+        <dl>
+          <dt>Display</dt>
+          <dd>6.7-inch OLED panel</dd>
+          <dt>Charging</dt>
+          <dd>65W wired fast charging</dd>
+        </dl>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Display: 6.7-inch OLED panel\n\nCharging: 65W wired fast charging"
+    ]);
+  });
+
+  it("groups aria table key-value grids into one translatable block", () => {
+    document.body.innerHTML = `
+      <main>
+        <section role="table">
+          <div role="row">
+            <span role="rowheader">Material</span>
+            <span role="cell">Aluminum</span>
+          </div>
+          <div role="row">
+            <span role="rowheader">Warranty</span>
+            <span role="cell">2 years</span>
+          </div>
+        </section>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual(["Material: Aluminum\n\nWarranty: 2 years"]);
+  });
+
+  it("collects the main post plus both layers of quote cards as independent translatable blocks", () => {
+    document.body.innerHTML = `
+      <main>
+        <article>
+          <p>Primary feed post introducing the launch.</p>
+          <div class="quote-stack">
+            <blockquote id="outer-quote">
+              <p>Outer quote explaining the first repost context.</p>
+              <p>Outer quote closing note after the nested card.</p>
+            </blockquote>
+            <div class="nested-quote-slot">
+              <blockquote id="inner-quote">
+                <p>Inner quote that should remain a standalone translated card.</p>
+              </blockquote>
+            </div>
+          </div>
+        </article>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks[0]?.sourceText).toBe("Primary feed post introducing the launch.");
+    expect(
+      blocks.some(
+        (block) =>
+          block.element.id === "outer-quote" &&
+          block.sourceText === "Outer quote explaining the first repost context. Outer quote closing note after the nested card."
+      )
+    ).toBe(true);
+    expect(
+      blocks.some(
+        (block) =>
+          block.element.id === "inner-quote" &&
+          block.sourceText === "Inner quote that should remain a standalone translated card."
+      )
+    ).toBe(true);
+  });
+
   it("skips mostly numeric or timestamp-like content", () => {
     document.body.innerHTML = `
       <main>

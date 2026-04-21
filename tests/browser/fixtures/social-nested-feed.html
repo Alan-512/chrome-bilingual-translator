@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Nested Social Feed Fixture</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #eef2f7; color: #101828; }
+      main { max-width: 760px; margin: 32px auto; }
+      article { background: white; border: 1px solid #dce4ef; border-radius: 20px; padding: 24px; }
+      blockquote { margin: 18px 0 0; padding: 16px; border-left: 4px solid #6b7cff; background: #f7f8ff; }
+      footer { display: flex; gap: 12px; margin-top: 20px; }
+      button { border: 0; background: #f3f4f6; border-radius: 999px; padding: 8px 14px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article id="social-post">
+        <p>The launch note explains why the new workflow keeps the product surface simpler for end users.</p>
+        <div class="quote-stack">
+          <blockquote id="outer-quote">
+            <p>The repost adds context about why the team changed the onboarding flow.</p>
+            <p>The repost closes by linking back to the changelog for implementation details.</p>
+          </blockquote>
+          <div class="nested-quote-slot">
+            <blockquote id="inner-quote">
+              <p>The original quoted card says the experiment reduced setup friction by 24%.</p>
+            </blockquote>
+          </div>
+        </div>
+        <figure>
+          <img src="/mock-social.png" alt="Design comparison" />
+          <figcaption>The attached screenshot compares the old sidebar density with the new reading layout.</figcaption>
+        </figure>
+        <footer>
+          <button>Reply</button>
+          <button>Repost</button>
+          <button>Like</button>
+        </footer>
+      </article>
+    </main>
+  </body>
+</html>

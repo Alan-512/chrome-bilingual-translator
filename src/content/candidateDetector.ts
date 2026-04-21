@@ -16,6 +16,10 @@ const CONTENT_SELECTOR = [
   "p",
   "li",
   "blockquote",
+  "table",
+  "dl",
+  "[role='table']",
+  "[role='grid']",
   "figcaption",
   "h1",
   "h2",
@@ -41,6 +45,7 @@ const CONTENT_SELECTOR = [
 const DISALLOWED_ANCESTORS = ["nav", "header", "footer", "aside", "button"];
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
 const REDUNDANT_CONTAINER_SELECTOR = "p, li, blockquote, figcaption, h1, h2, h3, h4, h5, h6";
+const STRUCTURED_ROOT_SELECTOR = "blockquote, table, dl, [role='table'], [role='grid']";
 let nextSourceId = 0;
 
 function isExtensionOwned(element: Element): boolean {
@@ -75,6 +80,126 @@ function looksLikeMostlyNumericText(text: string): boolean {
   return /^[\d.,:+\-/%年月日点分秒]+(?:points?)?$/i.test(stripped);
 }
 
+function normalizeText(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function collectTableText(tableRoot: HTMLElement): string {
+  const rows = Array.from(
+    tableRoot.querySelectorAll<HTMLElement>(
+      ":scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr, :scope > tr, :scope [role='row']"
+    )
+  );
+
+  const normalizedRows = rows
+    .map((row) => {
+      const cells = Array.from(
+        row.querySelectorAll<HTMLElement>(":scope > th, :scope > td, :scope > [role='rowheader'], :scope > [role='cell']")
+      )
+        .map((cell) => normalizeText(cell.textContent ?? ""))
+        .filter(Boolean);
+
+      if (cells.length === 2) {
+        return `${cells[0]}: ${cells[1]}`;
+      }
+
+      return cells.join(" | ");
+    })
+    .filter(Boolean);
+
+  return normalizedRows.join("\n\n");
+}
+
+function collectDescriptionListText(listRoot: HTMLElement): string {
+  const directChildren = Array.from(listRoot.children) as HTMLElement[];
+  const parts: string[] = [];
+  let pendingTerm = "";
+
+  directChildren.forEach((child) => {
+    const text = normalizeText(child.textContent ?? "");
+    if (!text) {
+      return;
+    }
+
+    if (child.tagName === "DT") {
+      pendingTerm = text;
+      return;
+    }
+
+    if (child.tagName === "DD") {
+      parts.push(pendingTerm ? `${pendingTerm}: ${text}` : text);
+      pendingTerm = "";
+    }
+  });
+
+  if (parts.length > 0) {
+    return parts.join("\n\n");
+  }
+
+  return normalizeText(listRoot.textContent ?? "");
+}
+
+function collectNestedBlockquoteText(blockquoteRoot: HTMLElement): string {
+  let sourceText = normalizeText(blockquoteRoot.textContent ?? "");
+  const nestedStructuredRoots = Array.from(blockquoteRoot.querySelectorAll<HTMLElement>(STRUCTURED_ROOT_SELECTOR)).filter(
+    (nestedRoot) => nestedRoot !== blockquoteRoot
+  );
+
+  nestedStructuredRoots.forEach((nestedRoot) => {
+    const nestedText = normalizeText(nestedRoot.textContent ?? "");
+    if (!nestedText) {
+      return;
+    }
+
+    sourceText = normalizeText(sourceText.replace(nestedText, " "));
+  });
+
+  return sourceText;
+}
+
+function collectStructuredGenericCandidateBlock(element: HTMLElement): CandidateBlock | null {
+  if (element.tagName === "TABLE" || element.getAttribute("role") === "table" || element.getAttribute("role") === "grid") {
+    const sourceText = collectTableText(element);
+    if (!sourceText) {
+      return null;
+    }
+
+    return {
+      blockId: getStableBlockId(element),
+      element,
+      sourceText
+    };
+  }
+
+  if (element.tagName === "DL") {
+    const sourceText = collectDescriptionListText(element);
+    if (!sourceText) {
+      return null;
+    }
+
+    return {
+      blockId: getStableBlockId(element),
+      element,
+      sourceText
+    };
+  }
+
+  if (element.tagName === "BLOCKQUOTE" && element.querySelector("blockquote") !== null) {
+    const sourceText = collectNestedBlockquoteText(element);
+    if (!sourceText) {
+      return null;
+    }
+
+    return {
+      blockId: getStableBlockId(element),
+      element,
+      sourceText
+    };
+  }
+
+  return null;
+}
+
 function getStableBlockId(element: HTMLElement): string {
   const existingId = element.getAttribute(SOURCE_ID_ATTRIBUTE);
   if (existingId) {
@@ -94,10 +219,29 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
   const siteCandidates: CandidateBlock[] = [];
   const genericCandidates: CandidateBlock[] = [];
   const groupedFeedCardIds = new Set<string>();
+  const groupedStructuredRootElements: HTMLElement[] = [];
   let matchedSiteCandidate = false;
 
   elements.forEach((element) => {
     if (isExtensionOwned(element) || isHidden(element)) {
+      return;
+    }
+
+    const structuredGenericCandidate = collectStructuredGenericCandidateBlock(element);
+    const enclosingStructuredRoot = element.closest<HTMLElement>(STRUCTURED_ROOT_SELECTOR);
+    const isInsideCollectedStructuredRoot =
+      !structuredGenericCandidate &&
+      groupedStructuredRootElements.some(
+        (structuredRoot) =>
+          structuredRoot !== element && (structuredRoot.contains(element) || (enclosingStructuredRoot !== null && structuredRoot === enclosingStructuredRoot))
+      );
+    const isNestedGenericStructuredDescendant =
+      page.site === "generic" &&
+      !element.matches(STRUCTURED_ROOT_SELECTOR) &&
+      enclosingStructuredRoot !== null &&
+      enclosingStructuredRoot !== element;
+
+    if (isInsideCollectedStructuredRoot || isNestedGenericStructuredDescendant) {
       return;
     }
 
@@ -119,11 +263,21 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
       return;
     }
 
+    if (structuredGenericCandidate) {
+      if (looksLikeMostlyNumericText(structuredGenericCandidate.sourceText)) {
+        return;
+      }
+
+      groupedStructuredRootElements.push(structuredGenericCandidate.element);
+      genericCandidates.push(structuredGenericCandidate);
+      return;
+    }
+
     if (isInsideDisallowedAncestor(element) || isRedundantSlotContainer(element)) {
       return;
     }
 
-    const sourceText = element.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    const sourceText = normalizeText(element.textContent ?? "");
     if (!sourceText) {
       return;
     }
@@ -139,9 +293,31 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
     });
   });
 
+  const filteredGenericCandidates = genericCandidates.filter((candidate) => {
+    return genericCandidates.every((otherCandidate) => {
+      if (otherCandidate === candidate) {
+        return true;
+      }
+
+      if (!otherCandidate.element.matches(STRUCTURED_ROOT_SELECTOR)) {
+        return true;
+      }
+
+      if (candidate.element === otherCandidate.element) {
+        return true;
+      }
+
+      if (!otherCandidate.element.contains(candidate.element)) {
+        return true;
+      }
+
+      return candidate.element.matches(STRUCTURED_ROOT_SELECTOR);
+    });
+  });
+
   if (matchedSiteCandidate) {
     if (shouldMergeGenericFallbackForPage(page)) {
-      const mergedGenericCandidates = genericCandidates.filter((genericCandidate) => {
+      const mergedGenericCandidates = filteredGenericCandidates.filter((genericCandidate) => {
         return siteCandidates.every((siteCandidate) => {
           if (siteCandidate.blockId === genericCandidate.blockId) {
             return false;
@@ -161,5 +337,5 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
     return siteCandidates;
   }
 
-  return genericCandidates;
+  return filteredGenericCandidates;
 }

@@ -1,12 +1,15 @@
 import type { CandidateBlock } from "../candidateDetector";
 import type { PageClassification } from "../pageClassifier";
 
-const GOOGLE_RESULT_ROOT_SELECTOR = ".MjjYud, .g, [data-snc], .related-question-pair, .kp-wholepage";
-const GOOGLE_SNIPPET_SELECTOR = ".VwiC3b, .yXK7lf, .MUxGbd, .hgKElc, .s3v9rd";
-const GOOGLE_TITLE_ANCHOR_SELECTOR = ".yuRUbf, [data-header-feature], [data-snf]";
+const GOOGLE_RESULT_ROOT_SELECTOR = ".MjjYud, .g, [data-snc], .related-question-pair, .kp-wholepage, [data-shopping-result]";
+const GOOGLE_SNIPPET_SELECTOR =
+  ".VwiC3b, .yXK7lf, .MUxGbd, .hgKElc, .s3v9rd, [data-shopping-result] [data-shopping-description], [data-shopping-result] [data-shopping-price]";
+const GOOGLE_TITLE_ANCHOR_SELECTOR =
+  ".yuRUbf, [data-header-feature], [data-snf], [data-shopping-result] a[href], [data-shopping-result] [data-shopping-link]";
 const GOOGLE_QUESTION_SELECTOR = ".related-question-pair [role='heading']";
 const GOOGLE_KNOWLEDGE_TITLE_SELECTOR = ".kp-wholepage [data-attrid='title']";
 const GOOGLE_KNOWLEDGE_DESCRIPTION_SELECTOR = ".kp-wholepage .kno-rdesc span";
+const GOOGLE_SHOPPING_TITLE_SELECTOR = "[data-shopping-result] [role='heading'], [data-shopping-result] h3";
 
 type GoogleSearchAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
@@ -48,6 +51,18 @@ function getBlockKind(element: HTMLElement) {
     return "knowledge-description";
   }
 
+  if (element.matches(GOOGLE_SHOPPING_TITLE_SELECTOR)) {
+    return "shopping-title";
+  }
+
+  if (element.matches("[data-shopping-result] [data-shopping-description]")) {
+    return "shopping-description";
+  }
+
+  if (element.matches("[data-shopping-result] [data-shopping-price]")) {
+    return "shopping-price";
+  }
+
   return null;
 }
 
@@ -58,6 +73,10 @@ function getKindIndex(resultRoot: HTMLElement, blockKind: string) {
 
   if (blockKind === "knowledge-title" || blockKind === "knowledge-description") {
     return getResultIndex(resultRoot, ".kp-wholepage");
+  }
+
+  if (blockKind.startsWith("shopping-")) {
+    return getResultIndex(resultRoot, "[data-shopping-result]");
   }
 
   return getResultIndex(resultRoot, ".MjjYud, .g, [data-snc]");

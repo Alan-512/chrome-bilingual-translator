@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Commerce Specs Fixture</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #f7f7f3; color: #1d1d1f; }
+      main { max-width: 900px; margin: 40px auto; background: white; padding: 32px; border-radius: 20px; }
+      table, dl, [role="table"] { width: 100%; margin-top: 24px; }
+      th, td, dt, dd, [role="rowheader"], [role="cell"] { padding: 10px 0; }
+      [role="table"] { display: grid; gap: 12px; grid-template-columns: 1fr; }
+      [role="row"] { display: grid; grid-template-columns: 180px 1fr; border-top: 1px solid #ececec; }
+      dt { font-weight: 700; margin-top: 16px; }
+      dd { margin: 4px 0 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Wireless Headphones Pro</h1>
+      <table id="spec-table">
+        <tbody>
+          <tr><th>Battery life</th><td>Up to 40 hours with ANC off</td></tr>
+          <tr><th>Charging</th><td>USB-C fast charge, 5 hours in 10 minutes</td></tr>
+        </tbody>
+      </table>
+      <dl id="spec-list">
+        <dt>Connectivity</dt>
+        <dd>Bluetooth 5.4 with multipoint pairing</dd>
+        <dt>Codecs</dt>
+        <dd>AAC, SBC, and low-latency gaming mode</dd>
+      </dl>
+      <section id="spec-grid" role="table" aria-label="Technical details">
+        <div role="row">
+          <span role="rowheader">Weight</span>
+          <span role="cell">242 grams</span>
+        </div>
+        <div role="row">
+          <span role="rowheader">Water resistance</span>
+          <span role="cell">IPX4 splash resistant</span>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
