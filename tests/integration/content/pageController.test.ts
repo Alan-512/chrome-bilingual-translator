@@ -757,6 +757,92 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("restarts observation when activate is triggered again after a same-tab URL navigation", async () => {
+    const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+    const observedGroups: HTMLElement[][] = [];
+    const visibleCallbacks: Array<(elements: HTMLElement[]) => void> = [];
+
+    window.history.replaceState({}, "", "/r/vibecoding/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a slot="title">Homepage title</a>
+          <div slot="text-body">Homepage preview body.</div>
+        </shreddit-post>
+      </main>
+    `;
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      isElementReadyForTranslation: (element) => element.getAttribute("slot") === "title",
+      createObserverCoordinator: () => ({
+        start(candidates, callbacks) {
+          observedGroups.push(candidates);
+          visibleCallbacks.push(callbacks.onVisible);
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    await controller.activate();
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(requestTranslations.mock.calls[0]?.[0]).toEqual([
+      {
+        blockId: expect.any(String),
+        sourceText: "Homepage title"
+      }
+    ]);
+    expect(observedGroups).toHaveLength(1);
+
+    window.history.replaceState({}, "", "/r/vibecoding/comments/abc123/example-post/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a slot="title">Detail title</a>
+          <div slot="text-body">
+            <p>First comment paragraph.</p>
+            <p>Second comment paragraph.</p>
+          </div>
+        </shreddit-post>
+      </main>
+    `;
+
+    await controller.activate();
+    expect(observedGroups).toHaveLength(2);
+    expect(requestTranslations).toHaveBeenCalledTimes(2);
+    expect(requestTranslations.mock.calls[1]?.[0]).toEqual([
+      {
+        blockId: expect.any(String),
+        sourceText: "Detail title"
+      }
+    ]);
+
+    const detailParagraphs = Array.from(document.querySelectorAll("[slot='text-body'] p")) as HTMLElement[];
+    visibleCallbacks.at(-1)?.(detailParagraphs);
+    await settlePromises();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(3);
+    expect(requestTranslations.mock.calls[2]?.[0]).toEqual([
+      {
+        blockId: expect.any(String),
+        sourceText: "First comment paragraph."
+      },
+      {
+        blockId: expect.any(String),
+        sourceText: "Second comment paragraph."
+      }
+    ]);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(3);
+    expect(Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']")).every((node) => node.textContent?.includes("ZH:"))).toBe(
+      true
+    );
+    await controller.deactivate();
+  });
+
   it("deactivates and removes injected translations", async () => {
     const controller = createPageController(document, {
       requestTranslations: async (blocks) =>

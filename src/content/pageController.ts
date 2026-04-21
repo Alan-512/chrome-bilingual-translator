@@ -147,6 +147,7 @@ export function createPageController(doc: Document, dependencies: PageController
   const translationMemory = new Map<string, string>();
   const renderedMemoryBlockIds = new Map<string, string>();
   const inFlightSignatures = new Set<string>();
+  let activePageHref = doc.location?.href ?? "";
 
   function removeStaleRenderedTranslationForMemoryKey(candidate: CandidateBlock) {
     const memoryKey = getCandidateMemoryKey(candidate);
@@ -370,10 +371,34 @@ export function createPageController(doc: Document, dependencies: PageController
     await Promise.all(batchPromises);
   }
 
+  function resetPageStateForNavigation() {
+    translatedBlockCount = 0;
+    pendingBlockCount = 0;
+    inFlightBatchCount = 0;
+    lastError = null;
+    failedBlockIds.clear();
+    queuedBatches.length = 0;
+    translationMemory.clear();
+    renderedMemoryBlockIds.clear();
+    inFlightSignatures.clear();
+    observerCoordinator.disconnect();
+    removeRenderedTranslations(doc);
+    stateStore.clear();
+    updateStatusPill(statusPill, { state: "idle", translatedBlockCount: 0 });
+  }
+
   return {
     async activate() {
+      const nextPageHref = doc.location?.href ?? "";
+      if (active && activePageHref !== nextPageHref) {
+        resetPageStateForNavigation();
+        activePageHref = nextPageHref;
+        active = false;
+      }
+
       if (!active) {
         active = true;
+        activePageHref = nextPageHref;
         await safeReportPageState(dependencies, {
           enabled: true,
           translatedBlockCount,
@@ -425,6 +450,7 @@ export function createPageController(doc: Document, dependencies: PageController
 
     async deactivate() {
       active = false;
+      activePageHref = doc.location?.href ?? "";
       translatedBlockCount = 0;
       pendingBlockCount = 0;
       inFlightBatchCount = 0;
