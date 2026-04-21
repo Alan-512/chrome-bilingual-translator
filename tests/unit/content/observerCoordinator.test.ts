@@ -140,4 +140,49 @@ describe("observerCoordinator", () => {
     expect(onMutation).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
+
+  it("waits for mutation activity to settle before flushing", async () => {
+    vi.useFakeTimers();
+    let mutationCallback: MutationCallback | undefined;
+
+    const coordinator = createObserverCoordinator(document, {
+      createIntersectionObserver() {
+        return {
+          observe: vi.fn(),
+          disconnect: vi.fn()
+        } as unknown as IntersectionObserver;
+      },
+      createMutationObserver(callback) {
+        mutationCallback = callback;
+        return {
+          observe: vi.fn(),
+          disconnect: vi.fn()
+        } as unknown as MutationObserver;
+      }
+    });
+
+    const onMutation = vi.fn();
+    coordinator.start([], {
+      onVisible: vi.fn(),
+      onMutation
+    });
+
+    const record = {
+      type: "childList",
+      target: document.createElement("main"),
+      addedNodes: [document.createElement("p")] as unknown as NodeList,
+      removedNodes: [] as unknown as NodeList
+    } as MutationRecord;
+
+    mutationCallback?.([record], {} as MutationObserver);
+    await vi.advanceTimersByTimeAsync(80);
+    mutationCallback?.([record], {} as MutationObserver);
+    await vi.advanceTimersByTimeAsync(80);
+
+    expect(onMutation).toHaveBeenCalledTimes(0);
+
+    await vi.advanceTimersByTimeAsync(50);
+    expect(onMutation).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
 });

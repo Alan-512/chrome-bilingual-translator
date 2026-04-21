@@ -8,23 +8,25 @@ type ObserverCoordinatorDependencies = {
   createMutationObserver?: (callback: MutationCallback) => MutationObserver;
 };
 
+const MUTATION_FLUSH_DEBOUNCE_MS = 120;
+
 export function createObserverCoordinator(
   doc: Document,
   dependencies: ObserverCoordinatorDependencies = {}
 ) {
-  let mutationFlushScheduled = false;
+  let mutationFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
   function scheduleMutationFlush() {
-    if (mutationFlushScheduled) {
-      return;
+    const clear = doc.defaultView?.clearTimeout?.bind(doc.defaultView) ?? clearTimeout;
+    if (mutationFlushTimer !== null) {
+      clear(mutationFlushTimer);
     }
 
-    mutationFlushScheduled = true;
     const schedule = doc.defaultView?.setTimeout?.bind(doc.defaultView) ?? setTimeout;
-    schedule(() => {
-      mutationFlushScheduled = false;
+    mutationFlushTimer = schedule(() => {
+      mutationFlushTimer = null;
       callbacks?.onMutation();
-    }, 0);
+    }, MUTATION_FLUSH_DEBOUNCE_MS);
   }
 
   function isExtensionOwnedNode(node: Node | null): boolean {
@@ -120,6 +122,11 @@ export function createObserverCoordinator(
     },
 
     disconnect() {
+      const clear = doc.defaultView?.clearTimeout?.bind(doc.defaultView) ?? clearTimeout;
+      if (mutationFlushTimer !== null) {
+        clear(mutationFlushTimer);
+        mutationFlushTimer = null;
+      }
       callbacks = null;
       intersectionObserver.disconnect();
       mutationObserver.disconnect();
