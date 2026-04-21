@@ -129,6 +129,48 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[1]?.renderHint?.anchorElement).toBe(feedBody);
   });
 
+  it("handles Reddit image, link-preview, and title-only listing cards without forcing a shared body shape", () => {
+    window.history.replaceState({}, "", "/r/vibecoding/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post id="image-post">
+          <a href="/r/vibecoding/comments/def456/image-post/" data-post-click-location="title">
+            <h3>RATE LIMIT RESET</h3>
+          </a>
+          <figure><img src="/mock-image.png" alt="Screenshot" /></figure>
+        </shreddit-post>
+        <shreddit-post id="link-post">
+          <a href="/r/vibecoding/comments/ghi789/link-post/" data-post-click-location="title">
+            <h3>OpenClaw is Linux for agents.</h3>
+          </a>
+          <div class="md feed-card-text-preview">
+            <p>We built the Mac. Same Opus 4.7, cloud-native, managed infrastructure.</p>
+          </div>
+        </shreddit-post>
+        <shreddit-post id="title-only-post">
+          <a href="/r/vibecoding/comments/jkl012/title-only/" data-post-click-location="title">
+            <h3>Need a better way to review AI-generated UI quickly</h3>
+          </a>
+        </shreddit-post>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "RATE LIMIT RESET",
+      "OpenClaw is Linux for agents.",
+      "We built the Mac. Same Opus 4.7, cloud-native, managed infrastructure.",
+      "Need a better way to review AI-generated UI quickly"
+    ]);
+    expect(blocks[0]?.rehydrateKey).toBe("reddit|listing|card-title|RATE LIMIT RESET");
+    expect(blocks[1]?.rehydrateKey).toBe("reddit|listing|card-title|OpenClaw is Linux for agents.");
+    expect(blocks[2]?.rehydrateKey).toBe(
+      "reddit|listing|card-body|We built the Mac. Same Opus 4.7, cloud-native, managed infrastructure."
+    );
+    expect(blocks[3]?.rehydrateKey).toBe("reddit|listing|card-title|Need a better way to review AI-generated UI quickly");
+  });
+
   it("keeps Reddit comments pages segmented instead of grouping the whole post card", () => {
     window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
     document.body.innerHTML = `
@@ -148,6 +190,13 @@ describe("collectCandidateBlocks", () => {
         <shreddit-comment thingid="t1_beta">
           <div class="md" slot="comment">
             <p>Codex with the resets I am loving it regardless what it is.</p>
+          </div>
+        </shreddit-comment>
+        <shreddit-comment thingid="t1_gamma" aria-expanded="false">
+          <div hidden aria-hidden="true">
+            <div class="md" slot="comment">
+              <p>This collapsed comment should stay untranslated until it is expanded.</p>
+            </div>
           </div>
         </shreddit-comment>
       </main>
@@ -195,6 +244,7 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[4]?.rehydrateKey).toBe(
       "reddit|detail|comment|t1_beta|Codex with the resets I am loving it regardless what it is."
     );
+    expect(blocks.some((block) => block.sourceText.includes("collapsed comment"))).toBe(false);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(postCard);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(postCard);
   });

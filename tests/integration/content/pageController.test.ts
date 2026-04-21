@@ -230,6 +230,57 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("translates Reddit image, link-preview, and title-only cards using per-card anchors instead of assuming text-body exists", async () => {
+    window.history.replaceState({}, "", "/r/codex/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post id="image-post">
+          <a href="/r/codex/comments/def456/image-post/" data-post-click-location="title">
+            <h3>RATE LIMIT RESET</h3>
+          </a>
+          <figure><img src="/mock-image.png" alt="Screenshot" /></figure>
+        </shreddit-post>
+        <shreddit-post id="link-post">
+          <a href="/r/codex/comments/ghi789/link-post/" data-post-click-location="title">
+            <h3>OpenClaw is Linux for agents.</h3>
+          </a>
+          <div class="md feed-card-text-preview">
+            <p>We built the Mac. Same Opus 4.7, cloud-native, managed infrastructure.</p>
+          </div>
+        </shreddit-post>
+        <shreddit-post id="title-only-post">
+          <a href="/r/codex/comments/jkl012/title-only/" data-post-click-location="title">
+            <h3>Need a better way to review AI-generated UI quickly</h3>
+          </a>
+        </shreddit-post>
+      </main>
+    `;
+
+    const requestTranslations = vi.fn(async (blocks) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await controller.activate();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(requestTranslations.mock.calls[0]?.[0].map((block: { sourceText: string }) => block.sourceText)).toEqual([
+      "RATE LIMIT RESET",
+      "OpenClaw is Linux for agents.",
+      "We built the Mac. Same Opus 4.7, cloud-native, managed infrastructure.",
+      "Need a better way to review AI-generated UI quickly"
+    ]);
+    expect(document.querySelector("#image-post [data-post-click-location='title'] + [data-bilingual-translator-owned='true']")).not.toBeNull();
+    expect(document.querySelector("#link-post .md.feed-card-text-preview + [data-bilingual-translator-owned='true']")).not.toBeNull();
+    expect(document.querySelector("#title-only-post [data-post-click-location='title'] + [data-bilingual-translator-owned='true']")).not.toBeNull();
+    await controller.deactivate();
+  });
+
   it("observes dynamically added content without translating it until it becomes visible", async () => {
     let mutationCallback: (() => void) | undefined;
     let visibleCallback: ((elements: HTMLElement[]) => void) | undefined;

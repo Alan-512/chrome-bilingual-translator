@@ -47,7 +47,14 @@ function isExtensionOwned(element: Element): boolean {
 }
 
 function isHidden(element: HTMLElement): boolean {
-  return element.hidden || element.style.display === "none" || element.getAttribute("aria-hidden") === "true";
+  if (element.hidden || element.style.display === "none" || element.getAttribute("aria-hidden") === "true") {
+    return true;
+  }
+
+  return (
+    element.closest<HTMLElement>("[hidden], [aria-hidden='true']") !== null ||
+    element.closest<HTMLElement>("[style*='display: none']") !== null
+  );
 }
 
 function isInsideDisallowedAncestor(element: Element): boolean {
