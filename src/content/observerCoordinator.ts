@@ -9,24 +9,42 @@ type ObserverCoordinatorDependencies = {
 };
 
 const MUTATION_FLUSH_DEBOUNCE_MS = 120;
+const SCROLL_SETTLE_DEBOUNCE_MS = 180;
 
 export function createObserverCoordinator(
   doc: Document,
   dependencies: ObserverCoordinatorDependencies = {}
 ) {
   let mutationFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastScrollAt = 0;
+
+  const clearTimeoutFn = doc.defaultView?.clearTimeout?.bind(doc.defaultView) ?? clearTimeout;
+  const setTimeoutFn = doc.defaultView?.setTimeout?.bind(doc.defaultView) ?? setTimeout;
+
+  function clearMutationFlushTimer() {
+    if (mutationFlushTimer !== null) {
+      clearTimeoutFn(mutationFlushTimer);
+      mutationFlushTimer = null;
+    }
+  }
 
   function scheduleMutationFlush() {
-    const clear = doc.defaultView?.clearTimeout?.bind(doc.defaultView) ?? clearTimeout;
-    if (mutationFlushTimer !== null) {
-      clear(mutationFlushTimer);
-    }
+    clearMutationFlushTimer();
 
-    const schedule = doc.defaultView?.setTimeout?.bind(doc.defaultView) ?? setTimeout;
-    mutationFlushTimer = schedule(() => {
+    const now = Date.now();
+    const scrollCooldown = Math.max(0, SCROLL_SETTLE_DEBOUNCE_MS - (now - lastScrollAt));
+    const flushDelay = Math.max(MUTATION_FLUSH_DEBOUNCE_MS, scrollCooldown);
+    mutationFlushTimer = setTimeoutFn(() => {
       mutationFlushTimer = null;
       callbacks?.onMutation();
-    }, MUTATION_FLUSH_DEBOUNCE_MS);
+    }, flushDelay);
+  }
+
+  function handleScroll() {
+    lastScrollAt = Date.now();
+    if (mutationFlushTimer !== null) {
+      scheduleMutationFlush();
+    }
   }
 
   function isExtensionOwnedNode(node: Node | null): boolean {
@@ -113,6 +131,8 @@ export function createObserverCoordinator(
           subtree: true
         });
       }
+
+      doc.defaultView?.addEventListener("scroll", handleScroll, { passive: true });
     },
 
     observeCandidates(candidates: HTMLElement[]) {
@@ -122,12 +142,9 @@ export function createObserverCoordinator(
     },
 
     disconnect() {
-      const clear = doc.defaultView?.clearTimeout?.bind(doc.defaultView) ?? clearTimeout;
-      if (mutationFlushTimer !== null) {
-        clear(mutationFlushTimer);
-        mutationFlushTimer = null;
-      }
+      clearMutationFlushTimer();
       callbacks = null;
+      doc.defaultView?.removeEventListener("scroll", handleScroll);
       intersectionObserver.disconnect();
       mutationObserver.disconnect();
     }
