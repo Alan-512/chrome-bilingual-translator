@@ -208,16 +208,28 @@ function applyHorizontalLayoutFromAnchor(translationElement: HTMLElement, anchor
     return;
   }
 
+  translationElement.style.textAlign = computedStyle.textAlign;
+
   if (isCssLength(computedStyle.width)) {
     translationElement.style.width = computedStyle.width;
   }
 
-  if (isCssLength(computedStyle.marginLeft)) {
+  if (isCssLength(computedStyle.marginLeft) || computedStyle.marginLeft === "auto") {
     translationElement.style.marginLeft = computedStyle.marginLeft;
   }
 
-  if (isCssLength(computedStyle.marginRight)) {
+  if (isCssLength(computedStyle.marginRight) || computedStyle.marginRight === "auto") {
     translationElement.style.marginRight = computedStyle.marginRight;
+  }
+
+  if (
+    computedStyle.textAlign === "center" &&
+    !isCssLength(computedStyle.width) &&
+    computedStyle.marginLeft !== "auto" &&
+    computedStyle.marginRight !== "auto"
+  ) {
+    translationElement.style.marginLeft = "auto";
+    translationElement.style.marginRight = "auto";
   }
 }
 

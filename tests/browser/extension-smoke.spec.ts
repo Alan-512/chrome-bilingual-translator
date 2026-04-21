@@ -411,6 +411,34 @@ test("keeps generic article translations aligned with centered reading columns",
       "margin-left",
       await mediumParagraph.evaluate((node) => getComputedStyle(node).marginLeft)
     );
+
+    const heroTitle = page.locator("#hero-title");
+    const heroTitleTranslation = page.locator(".hero-like [data-bilingual-translator-owned='true']").filter({
+      hasText: "中文翻译：Trending"
+    });
+    const heroSummary = page.locator("#hero-summary");
+    const heroSummaryTranslation = page.locator(".hero-like [data-bilingual-translator-owned='true']").filter({
+      hasText: "中文翻译：See what the GitHub community is most excited about today."
+    });
+
+    await expect(heroTitleTranslation).toContainText("中文翻译");
+    await expect(heroSummaryTranslation).toContainText("中文翻译");
+    await expect(heroTitleTranslation).toHaveCSS("text-align", "center");
+    await expect(heroSummaryTranslation).toHaveCSS("text-align", "center");
+
+    const heroTitleBox = await heroTitle.boundingBox();
+    const heroTitleTranslationBox = await heroTitleTranslation.boundingBox();
+    const heroSummaryBox = await heroSummary.boundingBox();
+    const heroSummaryTranslationBox = await heroSummaryTranslation.boundingBox();
+
+    if (!heroTitleBox || !heroTitleTranslationBox || !heroSummaryBox || !heroSummaryTranslationBox) {
+      throw new Error("Centered hero layout did not produce layout boxes.");
+    }
+
+    expect(Math.abs(heroTitleBox.x + heroTitleBox.width / 2 - (heroTitleTranslationBox.x + heroTitleTranslationBox.width / 2))).toBeLessThan(6);
+    expect(
+      Math.abs(heroSummaryBox.x + heroSummaryBox.width / 2 - (heroSummaryTranslationBox.x + heroSummaryTranslationBox.width / 2))
+    ).toBeLessThan(6);
   } finally {
     await context.close();
     await mockServer.close();
