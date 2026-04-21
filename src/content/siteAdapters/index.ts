@@ -11,7 +11,7 @@ type SiteAdapterHelpers = {
 };
 
 type SiteAdapter = {
-  allowGenericFallback: (page: PageClassification) => boolean;
+  genericFallbackMode: (page: PageClassification) => "never" | "when-empty" | "merge";
   collectCandidateBlock: (
     element: HTMLElement,
     page: PageClassification,
@@ -20,27 +20,27 @@ type SiteAdapter = {
 };
 
 const REDDIT_ADAPTER: SiteAdapter = {
-  allowGenericFallback: (page) => page.surface === "detail",
+  genericFallbackMode: (page) => (page.surface === "detail" ? "merge" : "when-empty"),
   collectCandidateBlock: collectRedditCandidateBlock
 };
 
 const GITHUB_ADAPTER: SiteAdapter = {
-  allowGenericFallback: () => true,
+  genericFallbackMode: () => "when-empty",
   collectCandidateBlock: collectGitHubCandidateBlock
 };
 
 const GOOGLE_SEARCH_ADAPTER: SiteAdapter = {
-  allowGenericFallback: () => false,
+  genericFallbackMode: () => "never",
   collectCandidateBlock: collectGoogleSearchCandidateBlock
 };
 
 const OPENROUTER_ADAPTER: SiteAdapter = {
-  allowGenericFallback: () => false,
+  genericFallbackMode: () => "never",
   collectCandidateBlock: collectOpenRouterCandidateBlock
 };
 
 const PRODUCT_HUNT_ADAPTER: SiteAdapter = {
-  allowGenericFallback: () => false,
+  genericFallbackMode: () => "never",
   collectCandidateBlock: collectProductHuntCandidateBlock
 };
 
@@ -69,7 +69,11 @@ function getSiteAdapter(page: PageClassification): SiteAdapter | null {
 }
 
 export function allowGenericFallbackForPage(page: PageClassification): boolean {
-  return getSiteAdapter(page)?.allowGenericFallback(page) ?? true;
+  return (getSiteAdapter(page)?.genericFallbackMode(page) ?? "when-empty") !== "never";
+}
+
+export function shouldMergeGenericFallbackForPage(page: PageClassification): boolean {
+  return (getSiteAdapter(page)?.genericFallbackMode(page) ?? "when-empty") === "merge";
 }
 
 export function collectSiteCandidateBlock(

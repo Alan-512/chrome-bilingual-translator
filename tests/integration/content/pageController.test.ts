@@ -328,6 +328,52 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("translates nested replies only after a previously hidden thread is expanded and the page rescans", async () => {
+    const requestTranslations = vi.fn(async (blocks) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a slot="title">Detail title</a>
+          <div slot="text-body">
+            <p>Original post paragraph.</p>
+          </div>
+        </shreddit-post>
+        <section id="reply-thread" hidden aria-hidden="true">
+          <p id="nested-reply">A nested reply that is loaded after the thread is expanded.</p>
+        </section>
+      </main>
+    `;
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await controller.activate();
+    expect(requestTranslations.mock.calls.flatMap((call) => call[0].map((block: { sourceText: string }) => block.sourceText))).not.toContain(
+      "A nested reply that is loaded after the thread is expanded."
+    );
+
+    const replyThread = document.getElementById("reply-thread") as HTMLElement;
+    const nestedReply = document.getElementById("nested-reply") as HTMLElement;
+    replyThread.hidden = false;
+    replyThread.removeAttribute("hidden");
+    replyThread.removeAttribute("aria-hidden");
+
+    await controller.rescan();
+
+    expect(requestTranslations.mock.calls.flatMap((call) => call[0].map((block: { sourceText: string }) => block.sourceText))).toContain(
+      "A nested reply that is loaded after the thread is expanded."
+    );
+    expect(nestedReply.nextElementSibling?.textContent).toContain("ZH:A nested reply that is loaded after the thread is expanded.");
+    await controller.deactivate();
+  });
+
   it("re-hydrates visible translations after the host rerenders the same content", async () => {
     let mutationCallback: (() => void) | undefined;
     const requestTranslations = vi.fn(async (blocks) =>

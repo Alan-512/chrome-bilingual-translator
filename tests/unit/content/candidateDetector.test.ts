@@ -38,6 +38,33 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[0]?.sourceText).toBe("Actual article paragraph with enough meaning.");
   });
 
+  it("includes media captions as translatable content while still skipping footer action chrome", () => {
+    document.body.innerHTML = `
+      <main>
+        <article>
+          <p>Primary post body that explains the prototype changes.</p>
+          <blockquote>A quoted follow-up explaining why the layout improved.</blockquote>
+          <figure>
+            <img src="/mock-card.png" alt="Prototype card" />
+            <figcaption>The attached comparison card highlights spacing fixes and hierarchy improvements.</figcaption>
+          </figure>
+          <footer>
+            <button>Like</button>
+            <button>Share</button>
+          </footer>
+        </article>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Primary post body that explains the prototype changes.",
+      "A quoted follow-up explaining why the layout improved.",
+      "The attached comparison card highlights spacing fixes and hierarchy improvements."
+    ]);
+  });
+
   it("skips mostly numeric or timestamp-like content", () => {
     document.body.innerHTML = `
       <main>
@@ -247,6 +274,31 @@ describe("collectCandidateBlocks", () => {
     expect(blocks.some((block) => block.sourceText.includes("collapsed comment"))).toBe(false);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(postCard);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(postCard);
+  });
+
+  it("merges generic fallback content on Reddit detail pages without reintroducing duplicates inside the main post card", () => {
+    window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a slot="title">Detail title</a>
+          <div slot="text-body">
+            <p>Original post paragraph.</p>
+          </div>
+        </shreddit-post>
+        <section>
+          <p>Nested reply that lives outside the main shreddit-post container.</p>
+        </section>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Detail title",
+      "Original post paragraph.",
+      "Nested reply that lives outside the main shreddit-post container."
+    ]);
   });
 
   it("limits GitHub repository home candidates to README and about content", () => {

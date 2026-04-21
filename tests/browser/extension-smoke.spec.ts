@@ -30,6 +30,8 @@ function startMockTranslationServer() {
   const fixtureRoutes = new Map<string, string>([
     ["/article", "article.html"],
     ["/article-layouts", "article-layouts.html"],
+    ["/docs-interactions", "docs-interactions.html"],
+    ["/social-feed", "social-feed.html"],
     ["/search?q=antigravity", "google-serp.html"],
     ["/r/vibecoding/", "reddit-listing.html"],
     ["/r/ChatGPT/comments/abc123/example-post/", "reddit-detail.html"],
@@ -235,6 +237,8 @@ test("handles Google search result titles, snippets, videos, questions, and know
 
     await expect(page.locator(".yuRUbf + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
     await expect(page.locator(".VwiC3b + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+    await expect(page.locator(".hgKElc + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+    await expect(page.locator(".s3v9rd + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
 
     await page.locator(".related-question-pair").scrollIntoViewIfNeeded();
     await expect(page.locator(".related-question-pair [data-bilingual-translator-owned='true']").first()).toContainText(
@@ -243,6 +247,56 @@ test("handles Google search result titles, snippets, videos, questions, and know
 
     await page.locator(".kp-wholepage").scrollIntoViewIfNeeded();
     await expect(page.locator(".kp-wholepage [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+  } finally {
+    await context.close();
+    await mockServer.close();
+  }
+});
+
+test("keeps generic docs tabs and accordion content scoped to visible panels only", async () => {
+  const mockServer = await startMockTranslationServer();
+  const userDataDir = test.info().outputPath("docs-interactions-user-data");
+  const { context, background } = await launchExtensionContext(userDataDir);
+
+  try {
+    await configureMockTranslator(background, `${mockServer.origin}/v1/chat/completions`);
+
+    const page = await context.newPage();
+    await page.goto(buildFixtureUrl(mockServer.port, "/docs-interactions"));
+    await page.bringToFront();
+    const [tab] = await background.evaluate(async () => chrome.tabs.query({ active: true, currentWindow: true }));
+
+    await injectAndActivate(background, tab.id);
+
+    await expect(page.locator("#visible-tab p + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
+    await expect(page.locator("#open-accordion p + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
+    await expect(page.locator("#hidden-tab [data-bilingual-translator-owned='true']")).toHaveCount(0);
+    await expect(page.locator("#closed-accordion [data-bilingual-translator-owned='true']")).toHaveCount(0);
+  } finally {
+    await context.close();
+    await mockServer.close();
+  }
+});
+
+test("translates social-feed body, quote block, and media caption without touching action chrome", async () => {
+  const mockServer = await startMockTranslationServer();
+  const userDataDir = test.info().outputPath("social-feed-user-data");
+  const { context, background } = await launchExtensionContext(userDataDir);
+
+  try {
+    await configureMockTranslator(background, `${mockServer.origin}/v1/chat/completions`);
+
+    const page = await context.newPage();
+    await page.goto(buildFixtureUrl(mockServer.port, "/social-feed"));
+    await page.bringToFront();
+    const [tab] = await background.evaluate(async () => chrome.tabs.query({ active: true, currentWindow: true }));
+
+    await injectAndActivate(background, tab.id);
+
+    await expect(page.locator("#social-post p + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+    await expect(page.locator("#social-post blockquote + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
+    await expect(page.locator("#social-post figcaption + [data-bilingual-translator-owned='true']")).toContainText("中文翻译");
+    await expect(page.locator("#social-post footer [data-bilingual-translator-owned='true']")).toHaveCount(0);
   } finally {
     await context.close();
     await mockServer.close();

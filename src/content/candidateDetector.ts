@@ -1,5 +1,5 @@
 import { classifyPage } from "./pageClassifier";
-import { allowGenericFallbackForPage, collectSiteCandidateBlock } from "./siteAdapters";
+import { allowGenericFallbackForPage, collectSiteCandidateBlock, shouldMergeGenericFallbackForPage } from "./siteAdapters";
 
 export type CandidateBlock = {
   blockId: string;
@@ -16,6 +16,7 @@ const CONTENT_SELECTOR = [
   "p",
   "li",
   "blockquote",
+  "figcaption",
   "h1",
   "h2",
   "h3",
@@ -39,7 +40,7 @@ const CONTENT_SELECTOR = [
 ].join(", ");
 const DISALLOWED_ANCESTORS = ["nav", "header", "footer", "aside", "button"];
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
-const REDUNDANT_CONTAINER_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
+const REDUNDANT_CONTAINER_SELECTOR = "p, li, blockquote, figcaption, h1, h2, h3, h4, h5, h6";
 let nextSourceId = 0;
 
 function isExtensionOwned(element: Element): boolean {
@@ -139,6 +140,20 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
   });
 
   if (matchedSiteCandidate) {
+    if (shouldMergeGenericFallbackForPage(page)) {
+      const mergedGenericCandidates = genericCandidates.filter((genericCandidate) => {
+        return siteCandidates.every((siteCandidate) => {
+          if (siteCandidate.blockId === genericCandidate.blockId) {
+            return false;
+          }
+
+          return !siteCandidate.element.contains(genericCandidate.element) && !genericCandidate.element.contains(siteCandidate.element);
+        });
+      });
+
+      return [...siteCandidates, ...mergedGenericCandidates];
+    }
+
     return siteCandidates;
   }
 

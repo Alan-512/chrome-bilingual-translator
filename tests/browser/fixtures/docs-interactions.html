@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Docs Interactions Fixture</title>
+  </head>
+  <body>
+    <main>
+      <section>
+        <div role="tablist">
+          <button role="tab" aria-selected="true">Overview</button>
+          <button role="tab" aria-selected="false">API</button>
+        </div>
+        <div id="visible-tab" role="tabpanel">
+          <p>Install the extension once and configure an API endpoint.</p>
+        </div>
+        <div id="hidden-tab" role="tabpanel" hidden aria-hidden="true">
+          <p>This hidden API tab content should not be translated yet.</p>
+        </div>
+      </section>
+
+      <section id="open-accordion">
+        <h2>Open section</h2>
+        <p>This expanded accordion section should be translated.</p>
+      </section>
+
+      <section id="closed-accordion" hidden aria-hidden="true">
+        <h2>Closed section</h2>
+        <p>This collapsed accordion section should stay untranslated.</p>
+      </section>
+    </main>
+  </body>
+</html>
