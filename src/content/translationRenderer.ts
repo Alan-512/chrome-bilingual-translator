@@ -170,6 +170,10 @@ function resolveSourceTranslationAnchor(element: HTMLElement): HTMLElement {
 }
 
 function resolveExplicitTranslationAnchor(element: HTMLElement): HTMLElement {
+  if (element.getAttribute("slot") === "title") {
+    return element;
+  }
+
   if (!isInlineLikeElement(element)) {
     return element;
   }

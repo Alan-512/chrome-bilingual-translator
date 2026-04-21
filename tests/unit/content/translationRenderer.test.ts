@@ -173,6 +173,27 @@ describe("renderTranslationBelow", () => {
     expect((summary.nextElementSibling as HTMLElement).textContent).toBe("OpenAI：GPT-4o Mini TTS");
   });
 
+  it("keeps explicit slot title anchors directly under the title element", () => {
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a id="title" slot="title">How to not look like vibe coded app</a>
+          <div id="body" slot="text-body">Preview body</div>
+        </shreddit-post>
+      </main>
+    `;
+    const title = document.getElementById("title") as HTMLAnchorElement;
+
+    renderTranslationBelow(title, {
+      blockId: "alpha",
+      translationText: "如何避免应用看起来有种 AI 生成感",
+      anchorElement: title
+    });
+
+    expect(title.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
+    expect((title.nextElementSibling as HTMLElement).textContent).toBe("如何避免应用看起来有种 AI 生成感");
+  });
+
   it("normalizes explicit inline anchors to the nearest semantic block on search-result layouts", () => {
     document.body.innerHTML = `
       <main>

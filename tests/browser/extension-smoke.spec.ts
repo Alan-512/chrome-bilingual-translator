@@ -278,7 +278,7 @@ test("keeps generic article translations aligned with centered reading columns",
   }
 });
 
-test("renders Reddit listing translations below the feed preview instead of inside the card title flow", async () => {
+test("renders Reddit listing title and preview translations under their own source blocks", async () => {
   const mockServer = await startMockTranslationServer();
   const userDataDir = test.info().outputPath("reddit-listing-user-data");
   const { context, background } = await launchExtensionContext(userDataDir);
@@ -293,6 +293,9 @@ test("renders Reddit listing translations below the feed preview instead of insi
 
     await injectAndActivate(background, tab.id);
 
+    await expect(page.locator("shreddit-post [slot='title'] + [data-bilingual-translator-owned='true']").first()).toContainText(
+      "中文翻译"
+    );
     await expect(page.locator("shreddit-post [slot='text-body'] + [data-bilingual-translator-owned='true']").first()).toContainText(
       "中文翻译"
     );

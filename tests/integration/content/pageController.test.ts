@@ -176,7 +176,7 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
-  it("translates Reddit feed cards as a single combined block below the preview body", async () => {
+  it("translates Reddit feed card titles and preview bodies as separate listing blocks", async () => {
     window.history.replaceState({}, "", "/r/codex/");
     document.body.innerHTML = `
       <main>
@@ -206,18 +206,25 @@ describe("pageController", () => {
     expect(requestTranslations.mock.calls[0]?.[0]).toEqual([
       {
         blockId: expect.any(String),
+        sourceText: "Kimi k2.6 Code Preview might be the current Open-code SOTA."
+      },
+      {
+        blockId: expect.any(String),
         sourceText:
-          "Kimi k2.6 Code Preview might be the current Open-code SOTA.\n\n" +
           "I might be overhyping this, but I'm genuinely blown away right now.\n\n" +
           "I've been testing it on a heavy production-level task."
       }
     ]);
 
+    const title = document.querySelector("[slot='title']") as HTMLElement;
     const previewBody = document.querySelector("[slot='text-body']") as HTMLElement;
-    const translation = previewBody.nextElementSibling as HTMLElement;
-    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(1);
-    expect(translation?.dataset.bilingualTranslatorOwned).toBe("true");
-    expect(translation?.textContent).toContain("ZH:Kimi k2.6 Code Preview might be the current Open-code SOTA.");
+    const titleTranslation = title.nextElementSibling as HTMLElement;
+    const bodyTranslation = previewBody.nextElementSibling as HTMLElement;
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(2);
+    expect(titleTranslation?.dataset.bilingualTranslatorOwned).toBe("true");
+    expect(bodyTranslation?.dataset.bilingualTranslatorOwned).toBe("true");
+    expect(titleTranslation?.textContent).toContain("ZH:Kimi k2.6 Code Preview might be the current Open-code SOTA.");
+    expect(bodyTranslation?.textContent).toContain("ZH:I might be overhyping this, but I'm genuinely blown away right now.");
     await controller.deactivate();
   });
 

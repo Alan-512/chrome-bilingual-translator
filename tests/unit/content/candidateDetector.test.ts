@@ -66,7 +66,7 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[0]?.sourceText).toBe("Original user content.");
   });
 
-  it("groups Reddit shreddit feed titles and body previews into a single card block", () => {
+  it("keeps Reddit shreddit feed titles and body previews as separate listing blocks", () => {
     window.history.replaceState({}, "", "/r/vibecoding/");
     document.body.innerHTML = `
       <main>
@@ -79,21 +79,24 @@ describe("collectCandidateBlocks", () => {
 
     const blocks = collectCandidateBlocks(document);
     const feedCard = document.querySelector("shreddit-post") as HTMLElement;
+    const feedTitle = feedCard.querySelector("[slot='title']") as HTMLElement;
     const feedBody = feedCard.querySelector("[slot='text-body']") as HTMLElement;
 
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]?.element.getAttribute("slot")).toBe("text-body");
-    expect(blocks[0]?.sourceText).toBe(
-      "A Reddit feed title that should be translated\n\nA feed preview paragraph that is shown on the homepage card."
-    );
-    expect(blocks[0]?.rehydrateKey).toBe(
-      "reddit|listing|card|A Reddit feed title that should be translated|A feed preview paragraph that is shown on the homepage card."
-    );
-    expect(blocks[0]?.renderHint?.anchorElement).toBe(feedBody);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]?.element).toBe(feedTitle);
+    expect(blocks[0]?.sourceText).toBe("A Reddit feed title that should be translated");
+    expect(blocks[0]?.rehydrateKey).toBe("reddit|listing|card-title|A Reddit feed title that should be translated");
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(feedTitle);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(feedCard);
+
+    expect(blocks[1]?.element).toBe(feedBody);
+    expect(blocks[1]?.sourceText).toBe("A feed preview paragraph that is shown on the homepage card.");
+    expect(blocks[1]?.rehydrateKey).toBe("reddit|listing|card-body|A feed preview paragraph that is shown on the homepage card.");
+    expect(blocks[1]?.renderHint?.anchorElement).toBe(feedBody);
+    expect(blocks[1]?.renderHint?.expansionRoot).toBe(feedCard);
   });
 
-  it("groups Reddit text-body containers with semantic children into a single card block", () => {
+  it("keeps Reddit listing title separate while grouping semantic body children into one body block", () => {
     window.history.replaceState({}, "", "/r/vibecoding/");
     document.body.innerHTML = `
       <main>
@@ -108,12 +111,16 @@ describe("collectCandidateBlocks", () => {
     `;
 
     const blocks = collectCandidateBlocks(document);
+    const feedTitle = document.querySelector("[slot='title']") as HTMLElement;
+    const feedBody = document.querySelector("[slot='text-body']") as HTMLElement;
 
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]?.element.getAttribute("slot")).toBe("text-body");
-    expect(blocks[0]?.sourceText).toBe(
-      "A Reddit feed title that should be translated\n\nFirst body paragraph.\n\nSecond body paragraph."
-    );
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]?.element).toBe(feedTitle);
+    expect(blocks[0]?.sourceText).toBe("A Reddit feed title that should be translated");
+    expect(blocks[1]?.element.getAttribute("slot")).toBe("text-body");
+    expect(blocks[1]?.sourceText).toBe("First body paragraph.\n\nSecond body paragraph.");
+    expect(blocks[1]?.rehydrateKey).toBe("reddit|listing|card-body|First body paragraph.|Second body paragraph.");
+    expect(blocks[1]?.renderHint?.anchorElement).toBe(feedBody);
   });
 
   it("keeps Reddit comments pages segmented instead of grouping the whole post card", () => {

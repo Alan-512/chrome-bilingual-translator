@@ -56,23 +56,43 @@ export function collectRedditCandidateBlock(
   const bodyElement = feedCard.querySelector<HTMLElement>("[slot='text-body']");
 
   if (page.surface === "listing") {
-    const sourceParts = [getNormalizedText(titleElement), getNormalizedGroupedText(bodyElement)].filter(Boolean);
-    const anchorElement = bodyElement ?? titleElement;
+    if (element === titleElement) {
+      const sourceText = getNormalizedText(titleElement);
+      if (!sourceText) {
+        return null;
+      }
 
-    if (!anchorElement || sourceParts.length === 0) {
-      return null;
+      return {
+        blockId: helpers.getStableBlockId(element),
+        element,
+        sourceText,
+        rehydrateKey: buildRedditRehydrateKey(page, ["card-title", sourceText]),
+        renderHint: {
+          anchorElement: titleElement,
+          expansionRoot: feedCard
+        }
+      };
     }
 
-    return {
-      blockId: helpers.getStableBlockId(anchorElement),
-      element: anchorElement,
-      sourceText: sourceParts.join("\n\n"),
-      rehydrateKey: buildRedditRehydrateKey(page, ["card", ...sourceParts]),
-      renderHint: {
-        anchorElement,
-        expansionRoot: feedCard
+    if (element === bodyElement) {
+      const sourceText = getNormalizedGroupedText(bodyElement);
+      if (!sourceText) {
+        return null;
       }
-    };
+
+      return {
+        blockId: helpers.getStableBlockId(element),
+        element,
+        sourceText,
+        rehydrateKey: buildRedditRehydrateKey(page, ["card-body", ...sourceText.split("\n\n")]),
+        renderHint: {
+          anchorElement: bodyElement,
+          expansionRoot: feedCard
+        }
+      };
+    }
+
+    return null;
   }
 
   if (page.surface !== "detail") {
