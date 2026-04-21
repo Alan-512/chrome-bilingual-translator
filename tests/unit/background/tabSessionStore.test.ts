@@ -33,4 +33,21 @@ describe("SessionStorageTabSessionStore", () => {
     const reloadedStore = new SessionStorageTabSessionStore(store.storageArea);
     await expect(reloadedStore.get(9)).resolves.toEqual(session);
   });
+
+  it("clears tab session metadata when a tab is reset", async () => {
+    const session: TabSessionRecord = {
+      enabled: true,
+      translatedBlockCount: 12,
+      pendingRequestCount: 2
+    };
+
+    await store.set(9, session);
+    await store.clear(9);
+
+    await expect(store.get(9)).resolves.toEqual({
+      enabled: false,
+      translatedBlockCount: 0,
+      pendingRequestCount: 0
+    });
+  });
 });

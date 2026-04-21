@@ -34,6 +34,12 @@ export class SessionStorageTabSessionStore {
     await this.storageArea.set({ [SESSION_STORAGE_KEY]: sessions });
   }
 
+  async clear(tabId: number): Promise<void> {
+    const sessions = await this.loadAll();
+    delete sessions[String(tabId)];
+    await this.storageArea.set({ [SESSION_STORAGE_KEY]: sessions });
+  }
+
   private async loadAll(): Promise<PersistedTabSessions> {
     const result = await this.storageArea.get(SESSION_STORAGE_KEY);
     const sessions = result[SESSION_STORAGE_KEY];

@@ -60,6 +60,18 @@ async function bootstrap() {
     void ensureMenuRegistered();
   });
 
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status !== "loading") {
+      return;
+    }
+
+    void tabSessionStore.clear(tabId);
+  });
+
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    void tabSessionStore.clear(tabId);
+  });
+
   registerOptionalContextMenuShownListener(chrome.contextMenus, (_info, tab) => {
     const tabId = tab?.id;
     if (typeof tabId !== "number") {
