@@ -181,8 +181,10 @@ describe("pageController", () => {
     document.body.innerHTML = `
       <main>
         <shreddit-post>
-          <a slot="title">Kimi k2.6 Code Preview might be the current Open-code SOTA.</a>
-          <div slot="text-body">
+          <a href="/r/codex/comments/abc123/example-post/" data-post-click-location="title">
+            <h3>Kimi k2.6 Code Preview might be the current Open-code SOTA.</h3>
+          </a>
+          <div data-post-click-location="text-body">
             <p>I might be overhyping this, but I'm genuinely blown away right now.</p>
             <p>I've been testing it on a heavy production-level task.</p>
           </div>
@@ -216,8 +218,8 @@ describe("pageController", () => {
       }
     ]);
 
-    const title = document.querySelector("[slot='title']") as HTMLElement;
-    const previewBody = document.querySelector("[slot='text-body']") as HTMLElement;
+    const title = document.querySelector("[data-post-click-location='title']") as HTMLElement;
+    const previewBody = document.querySelector("[data-post-click-location='text-body']") as HTMLElement;
     const titleTranslation = title.nextElementSibling as HTMLElement;
     const bodyTranslation = previewBody.nextElementSibling as HTMLElement;
     expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(2);

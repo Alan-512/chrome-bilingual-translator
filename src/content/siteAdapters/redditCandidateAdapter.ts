@@ -42,6 +42,39 @@ function getBodyBlockIndex(bodyElement: HTMLElement, element: HTMLElement) {
   return blockIndex >= 0 ? blockIndex : 0;
 }
 
+function getListingTitleContainer(feedCard: HTMLElement): HTMLElement | null {
+  return feedCard.querySelector<HTMLElement>("[slot='title'], [data-post-click-location='title']");
+}
+
+function getListingTitleTextElement(feedCard: HTMLElement): HTMLElement | null {
+  const titleContainer = getListingTitleContainer(feedCard);
+  return titleContainer?.querySelector<HTMLElement>("h1, h2, h3, h4, h5, h6") ?? titleContainer;
+}
+
+function getListingBodyContainer(feedCard: HTMLElement): HTMLElement | null {
+  return feedCard.querySelector<HTMLElement>("[slot='text-body'], [data-post-click-location='text-body'], .md.feed-card-text-preview");
+}
+
+function getCommentBody(element: HTMLElement): {
+  commentRoot: HTMLElement;
+  commentBody: HTMLElement;
+} | null {
+  const commentRoot = element.closest<HTMLElement>("shreddit-comment");
+  if (!commentRoot) {
+    return null;
+  }
+
+  const commentBody = commentRoot.querySelector<HTMLElement>("[slot='comment'], .md[slot='comment']");
+  if (!commentBody) {
+    return null;
+  }
+
+  return {
+    commentRoot,
+    commentBody
+  };
+}
+
 export function collectRedditCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
@@ -49,22 +82,48 @@ export function collectRedditCandidateBlock(
 ): CandidateBlock | null {
   const feedCard = element.closest<HTMLElement>(REDDIT_FEED_CARD_SELECTOR);
   if (!feedCard) {
-    return null;
+    const comment = getCommentBody(element);
+    if (!comment || page.surface !== "detail") {
+      return null;
+    }
+
+    if (element !== comment.commentBody && !comment.commentBody.contains(element)) {
+      return null;
+    }
+
+    const sourceText = getNormalizedGroupedText(comment.commentBody);
+    if (!sourceText) {
+      return null;
+    }
+
+    const commentThingId = comment.commentRoot.getAttribute("thingid") ?? sourceText;
+
+    return {
+      blockId: helpers.getStableBlockId(comment.commentBody),
+      element: comment.commentBody,
+      sourceText,
+      rehydrateKey: buildRedditRehydrateKey(page, ["comment", commentThingId, sourceText]),
+      renderHint: {
+        anchorElement: comment.commentBody,
+        expansionRoot: comment.commentRoot
+      }
+    };
   }
 
-  const titleElement = feedCard.querySelector<HTMLElement>("[slot='title']");
-  const bodyElement = feedCard.querySelector<HTMLElement>("[slot='text-body']");
+  const titleElement = getListingTitleContainer(feedCard);
+  const titleTextElement = getListingTitleTextElement(feedCard);
+  const bodyElement = getListingBodyContainer(feedCard);
 
   if (page.surface === "listing") {
-    if (element === titleElement) {
-      const sourceText = getNormalizedText(titleElement);
+    if (titleElement && (element === titleElement || titleElement.contains(element))) {
+      const sourceText = getNormalizedText(titleTextElement);
       if (!sourceText) {
         return null;
       }
 
       return {
-        blockId: helpers.getStableBlockId(element),
-        element,
+        blockId: helpers.getStableBlockId(titleElement),
+        element: titleElement,
         sourceText,
         rehydrateKey: buildRedditRehydrateKey(page, ["card-title", sourceText]),
         renderHint: {
@@ -74,15 +133,15 @@ export function collectRedditCandidateBlock(
       };
     }
 
-    if (element === bodyElement) {
+    if (bodyElement && (element === bodyElement || bodyElement.contains(element))) {
       const sourceText = getNormalizedGroupedText(bodyElement);
       if (!sourceText) {
         return null;
       }
 
       return {
-        blockId: helpers.getStableBlockId(element),
-        element,
+        blockId: helpers.getStableBlockId(bodyElement),
+        element: bodyElement,
         sourceText,
         rehydrateKey: buildRedditRehydrateKey(page, ["card-body", ...sourceText.split("\n\n")]),
         renderHint: {
@@ -104,10 +163,15 @@ export function collectRedditCandidateBlock(
     return null;
   }
 
-  if (element === titleElement) {
+  if (titleElement && (element === titleElement || titleElement.contains(element))) {
+    const sourceText = getNormalizedText(titleTextElement);
+    if (!sourceText) {
+      return null;
+    }
+
     return {
-      blockId: helpers.getStableBlockId(element),
-      element,
+      blockId: helpers.getStableBlockId(titleElement),
+      element: titleElement,
       sourceText,
       rehydrateKey: buildRedditRehydrateKey(page, ["post-title", sourceText]),
       renderHint: {

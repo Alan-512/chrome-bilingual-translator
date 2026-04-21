@@ -293,10 +293,14 @@ test("renders Reddit listing title and preview translations under their own sour
 
     await injectAndActivate(background, tab.id);
 
-    await expect(page.locator("shreddit-post [slot='title'] + [data-bilingual-translator-owned='true']").first()).toContainText(
+    await expect(
+      page.locator("shreddit-post [data-post-click-location='title'] + [data-bilingual-translator-owned='true']").first()
+    ).toContainText(
       "中文翻译"
     );
-    await expect(page.locator("shreddit-post [slot='text-body'] + [data-bilingual-translator-owned='true']").first()).toContainText(
+    await expect(
+      page.locator("shreddit-post [data-post-click-location='text-body'] + [data-bilingual-translator-owned='true']").first()
+    ).toContainText(
       "中文翻译"
     );
   } finally {
@@ -322,6 +326,7 @@ test("keeps Reddit detail translations segmented and anchors the title translati
 
     await expect(page.locator("[slot='title'] + [data-bilingual-translator-owned='true']")).toHaveCount(0);
     await expect(page.locator("p + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+    await expect(page.locator("shreddit-comment [slot='comment'] + [data-bilingual-translator-owned='true']")).toHaveCount(2);
   } finally {
     await context.close();
     await mockServer.close();

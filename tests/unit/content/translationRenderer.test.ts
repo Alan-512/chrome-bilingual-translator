@@ -194,6 +194,32 @@ describe("renderTranslationBelow", () => {
     expect((title.nextElementSibling as HTMLElement).textContent).toBe("如何避免应用看起来有种 AI 生成感");
   });
 
+  it("places explicit heading anchors outside wrapping title links on Reddit-style cards", () => {
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a id="title-link" href="/r/vibecoding/comments/abc123/example-post/" data-post-click-location="title">
+            <h3 id="title">Why does every AI model seem to converge on the same design?</h3>
+          </a>
+        </shreddit-post>
+      </main>
+    `;
+    const title = document.getElementById("title") as HTMLHeadingElement;
+    const titleLink = document.getElementById("title-link") as HTMLAnchorElement;
+
+    renderTranslationBelow(title, {
+      blockId: "alpha",
+      translationText: "为什么每个 AI 模型最后都会收敛到同一种设计？",
+      anchorElement: titleLink
+    });
+
+    expect(titleLink.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
+    expect(titleLink.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
+    expect((titleLink.nextElementSibling as HTMLElement).textContent).toBe(
+      "为什么每个 AI 模型最后都会收敛到同一种设计？"
+    );
+  });
+
   it("normalizes explicit inline anchors to the nearest semantic block on search-result layouts", () => {
     document.body.innerHTML = `
       <main>

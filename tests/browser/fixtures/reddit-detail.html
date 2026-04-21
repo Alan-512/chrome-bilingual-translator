@@ -7,13 +7,25 @@
   </head>
   <body>
     <main>
-      <shreddit-post>
+      <shreddit-post id="detail-post">
         <a slot="title">I found out why ChatGPT gets slower the longer you use it</a>
-        <div slot="text-body">
+        <div slot="text-body" class="md">
           <p>Been frustrated with chatgpt freezing in long chats for months.</p>
           <p>Chatgpt renders every single message in your browser at once.</p>
         </div>
       </shreddit-post>
+      <section id="comments">
+        <shreddit-comment thingid="t1_alpha">
+          <div class="md" slot="comment">
+            <p>Rate limit reset as a compensation for the bug... or a new model drop....</p>
+          </div>
+        </shreddit-comment>
+        <shreddit-comment thingid="t1_beta">
+          <div class="md" slot="comment">
+            <p>Codex with the resets I am loving it regardless what it is.</p>
+          </div>
+        </shreddit-comment>
+      </section>
     </main>
   </body>
 </html>

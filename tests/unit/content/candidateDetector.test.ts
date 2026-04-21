@@ -71,16 +71,20 @@ describe("collectCandidateBlocks", () => {
     document.body.innerHTML = `
       <main>
         <shreddit-post>
-          <a slot="title">A Reddit feed title that should be translated</a>
-          <div slot="text-body">A feed preview paragraph that is shown on the homepage card.</div>
+          <a href="/r/vibecoding/comments/abc123/example-post/" data-post-click-location="title">
+            <h3>A Reddit feed title that should be translated</h3>
+          </a>
+          <div data-post-click-location="text-body">
+            <p>A feed preview paragraph that is shown on the homepage card.</p>
+          </div>
         </shreddit-post>
       </main>
     `;
 
     const blocks = collectCandidateBlocks(document);
     const feedCard = document.querySelector("shreddit-post") as HTMLElement;
-    const feedTitle = feedCard.querySelector("[slot='title']") as HTMLElement;
-    const feedBody = feedCard.querySelector("[slot='text-body']") as HTMLElement;
+    const feedTitle = feedCard.querySelector("[data-post-click-location='title']") as HTMLElement;
+    const feedBody = feedCard.querySelector("[data-post-click-location='text-body']") as HTMLElement;
 
     expect(blocks).toHaveLength(2);
     expect(blocks[0]?.element).toBe(feedTitle);
@@ -101,8 +105,10 @@ describe("collectCandidateBlocks", () => {
     document.body.innerHTML = `
       <main>
         <shreddit-post>
-          <a slot="title">A Reddit feed title that should be translated</a>
-          <div slot="text-body">
+          <a href="/r/vibecoding/comments/abc123/example-post/" data-post-click-location="title">
+            <h3>A Reddit feed title that should be translated</h3>
+          </a>
+          <div data-post-click-location="text-body">
             <p>First body paragraph.</p>
             <p>Second body paragraph.</p>
           </div>
@@ -111,13 +117,13 @@ describe("collectCandidateBlocks", () => {
     `;
 
     const blocks = collectCandidateBlocks(document);
-    const feedTitle = document.querySelector("[slot='title']") as HTMLElement;
-    const feedBody = document.querySelector("[slot='text-body']") as HTMLElement;
+    const feedTitle = document.querySelector("[data-post-click-location='title']") as HTMLElement;
+    const feedBody = document.querySelector("[data-post-click-location='text-body']") as HTMLElement;
 
     expect(blocks).toHaveLength(2);
     expect(blocks[0]?.element).toBe(feedTitle);
     expect(blocks[0]?.sourceText).toBe("A Reddit feed title that should be translated");
-    expect(blocks[1]?.element.getAttribute("slot")).toBe("text-body");
+    expect(blocks[1]?.element.getAttribute("data-post-click-location")).toBe("text-body");
     expect(blocks[1]?.sourceText).toBe("First body paragraph.\n\nSecond body paragraph.");
     expect(blocks[1]?.rehydrateKey).toBe("reddit|listing|card-body|First body paragraph.|Second body paragraph.");
     expect(blocks[1]?.renderHint?.anchorElement).toBe(feedBody);
@@ -134,6 +140,16 @@ describe("collectCandidateBlocks", () => {
             <p>Chatgpt renders every single message in your browser at once.</p>
           </div>
         </shreddit-post>
+        <shreddit-comment thingid="t1_alpha">
+          <div class="md" slot="comment">
+            <p>Rate limit reset as a compensation for the bug... or a new model drop....</p>
+          </div>
+        </shreddit-comment>
+        <shreddit-comment thingid="t1_beta">
+          <div class="md" slot="comment">
+            <p>Codex with the resets I am loving it regardless what it is.</p>
+          </div>
+        </shreddit-comment>
       </main>
     `;
 
@@ -153,6 +169,14 @@ describe("collectCandidateBlocks", () => {
       {
         slot: null,
         text: "Chatgpt renders every single message in your browser at once."
+      },
+      {
+        slot: "comment",
+        text: "Rate limit reset as a compensation for the bug... or a new model drop...."
+      },
+      {
+        slot: "comment",
+        text: "Codex with the resets I am loving it regardless what it is."
       }
     ]);
     expect(blocks[0]?.renderHint?.anchorElement).toBe(firstParagraph);
@@ -164,6 +188,12 @@ describe("collectCandidateBlocks", () => {
     );
     expect(blocks[2]?.rehydrateKey).toBe(
       "reddit|detail|post-body|1|Chatgpt renders every single message in your browser at once."
+    );
+    expect(blocks[3]?.rehydrateKey).toBe(
+      "reddit|detail|comment|t1_alpha|Rate limit reset as a compensation for the bug... or a new model drop...."
+    );
+    expect(blocks[4]?.rehydrateKey).toBe(
+      "reddit|detail|comment|t1_beta|Codex with the resets I am loving it regardless what it is."
     );
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(postCard);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(postCard);
