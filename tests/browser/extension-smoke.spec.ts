@@ -502,7 +502,8 @@ test("keeps Reddit detail translations segmented and anchors the title translati
 
     await expect(page.locator("[slot='title'] + [data-bilingual-translator-owned='true']")).toHaveCount(0);
     await expect(page.locator("p + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
-    await expect(page.locator("shreddit-comment [slot='comment'] + [data-bilingual-translator-owned='true']")).toHaveCount(2);
+    await expect(page.locator("shreddit-comment[thingid='t1_alpha'] p + [data-bilingual-translator-owned='true']")).toHaveCount(1);
+    await expect(page.locator("shreddit-comment[thingid='t1_beta'] p + [data-bilingual-translator-owned='true']")).toHaveCount(1);
     await expect(page.locator("shreddit-comment[thingid='t1_gamma'] [data-bilingual-translator-owned='true']")).toHaveCount(0);
   } finally {
     await context.close();

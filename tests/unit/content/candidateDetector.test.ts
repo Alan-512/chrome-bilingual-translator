@@ -370,6 +370,12 @@ describe("collectCandidateBlocks", () => {
     expect(blocks.some((block) => block.sourceText.includes("collapsed comment"))).toBe(false);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(postCard);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(postCard);
+    expect(blocks[3]?.renderHint?.anchorElement).toBe(
+      document.querySelector<HTMLElement>("shreddit-comment[thingid='t1_alpha'] p")
+    );
+    expect(blocks[4]?.renderHint?.anchorElement).toBe(
+      document.querySelector<HTMLElement>("shreddit-comment[thingid='t1_beta'] p")
+    );
   });
 
   it("merges generic fallback content on Reddit detail pages without reintroducing duplicates inside the main post card", () => {

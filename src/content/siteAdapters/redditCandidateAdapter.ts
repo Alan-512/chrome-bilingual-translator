@@ -75,6 +75,11 @@ function getCommentBody(element: HTMLElement): {
   };
 }
 
+function getCommentAnchorElement(commentBody: HTMLElement): HTMLElement {
+  const semanticBlocks = Array.from(commentBody.querySelectorAll<HTMLElement>("p, li, blockquote"));
+  return semanticBlocks.at(-1) ?? commentBody;
+}
+
 export function collectRedditCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
@@ -104,7 +109,7 @@ export function collectRedditCandidateBlock(
       sourceText,
       rehydrateKey: buildRedditRehydrateKey(page, ["comment", commentThingId, sourceText]),
       renderHint: {
-        anchorElement: comment.commentBody,
+        anchorElement: getCommentAnchorElement(comment.commentBody),
         expansionRoot: comment.commentRoot
       }
     };
