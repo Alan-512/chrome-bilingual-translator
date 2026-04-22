@@ -1,4 +1,4 @@
-import { DEFAULT_EXTENSION_CONFIG, type ExtensionConfig } from "./config";
+import { DEFAULT_EXTENSION_CONFIG, normalizeTargetLanguage, type ExtensionConfig } from "./config";
 
 const CONFIG_STORAGE_KEY = "extensionConfig";
 
@@ -47,8 +47,13 @@ export async function loadExtensionConfig(storageArea: StorageAreaLike): Promise
     return DEFAULT_EXTENSION_CONFIG;
   }
 
-  return {
+  const mergedConfig = {
     ...DEFAULT_EXTENSION_CONFIG,
     ...(config as Partial<ExtensionConfig>)
+  };
+
+  return {
+    ...mergedConfig,
+    targetLanguage: normalizeTargetLanguage(mergedConfig.targetLanguage)
   };
 }

@@ -27,6 +27,7 @@ export type ApiTestMessage = {
     apiBaseUrl: string;
     apiKey: string;
     model: string;
+    targetLanguage?: string;
     translateTitles: boolean;
     translateShortContentBlocks: boolean;
   };

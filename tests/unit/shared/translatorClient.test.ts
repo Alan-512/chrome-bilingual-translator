@@ -18,6 +18,8 @@ describe("translator client", () => {
       expect(body.model).toBe("gpt-5-mini");
       expect(body.response_format).toEqual({ type: "json_object" });
       expect(body.messages[0].role).toBe("system");
+      expect(body.messages[0].content).toContain("Japanese");
+      expect(body.messages[1].content).toContain("Japanese");
       expect(body.messages[1].content).toContain("alpha");
       expect(body.messages[1].content).toContain("beta");
       expect(init?.signal).toBeInstanceOf(AbortSignal);
@@ -52,7 +54,8 @@ describe("translator client", () => {
         apiKey: "secret-key",
         model: "gpt-5-mini",
         translateTitles: true,
-        translateShortContentBlocks: true
+        translateShortContentBlocks: true,
+        targetLanguage: "ja"
       }),
       blocks: [
         { blockId: "alpha", sourceText: "Hello world" },

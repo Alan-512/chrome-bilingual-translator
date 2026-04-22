@@ -1,4 +1,4 @@
-import { type ExtensionConfig } from "./config";
+import { getTargetLanguagePromptLabel, type ExtensionConfig, type TargetLanguageCode } from "./config";
 import { type PersistentTranslationCache } from "./cacheStore";
 import { buildTranslationMessages, type TranslationPromptBlock } from "./promptBuilder";
 
@@ -138,7 +138,9 @@ function buildGeminiThinkingConfig(model: string) {
   return undefined;
 }
 
-function buildResponsesApiInput(blocks: TranslationBlockInput[]) {
+function buildResponsesApiInput(blocks: TranslationBlockInput[], targetLanguage: TargetLanguageCode) {
+  const targetLanguageLabel = getTargetLanguagePromptLabel(targetLanguage);
+
   return [
     {
       role: "system",
@@ -146,7 +148,7 @@ function buildResponsesApiInput(blocks: TranslationBlockInput[]) {
         {
           type: "input_text",
           text:
-            "You are a translation engine. Detect the source language automatically and translate every block to Simplified Chinese. Return a strict JSON object mapping each blockId to its translated string."
+            `You are a translation engine. Detect the source language automatically and translate every block to ${targetLanguageLabel}. Return a strict JSON object mapping each blockId to its translated string.`
         }
       ]
     },
@@ -157,7 +159,7 @@ function buildResponsesApiInput(blocks: TranslationBlockInput[]) {
           type: "input_text",
           text: JSON.stringify(
             {
-              task: "Translate the following content blocks into Simplified Chinese.",
+              task: `Translate the following content blocks into ${targetLanguageLabel}.`,
               blocks
             },
             null,
@@ -247,7 +249,9 @@ function buildApiTestRequest(config: ExtensionConfig) {
   };
 }
 
-function buildGeminiTranslationBody(model: string, blocks: TranslationBlockInput[]) {
+function buildGeminiTranslationBody(model: string, blocks: TranslationBlockInput[], targetLanguage: TargetLanguageCode) {
+  const targetLanguageLabel = getTargetLanguagePromptLabel(targetLanguage);
+
   return {
     ...(buildGeminiThinkingConfig(model)
       ? {
@@ -258,7 +262,7 @@ function buildGeminiTranslationBody(model: string, blocks: TranslationBlockInput
       parts: [
         {
           text:
-            "You are a translation engine. Detect the source language automatically and translate every block to Simplified Chinese. Return a strict JSON object mapping each blockId to its translated string."
+            `You are a translation engine. Detect the source language automatically and translate every block to ${targetLanguageLabel}. Return a strict JSON object mapping each blockId to its translated string.`
         }
       ]
     },
@@ -268,7 +272,7 @@ function buildGeminiTranslationBody(model: string, blocks: TranslationBlockInput
           {
             text: JSON.stringify(
               {
-                task: "Translate the following content blocks into Simplified Chinese.",
+                task: `Translate the following content blocks into ${targetLanguageLabel}.`,
                 blocks
               },
               null,
@@ -349,7 +353,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                   "Content-Type": "application/json",
                   "x-goog-api-key": config.apiKey
                 },
-                body: buildGeminiTranslationBody(config.model, uncachedBlocks)
+                body: buildGeminiTranslationBody(config.model, uncachedBlocks, config.targetLanguage)
               }
             : (() => {
                 const resolvedApi = resolveApiMode(config.apiBaseUrl);
@@ -380,7 +384,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                                   type: "json_object"
                                 }
                               }),
-                          messages: buildTranslationMessages(uncachedBlocks)
+                          messages: buildTranslationMessages(uncachedBlocks, config.targetLanguage)
                         }
                       : {
                           model: config.model,
@@ -391,7 +395,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                                 }
                               }
                             : {}),
-                          input: buildResponsesApiInput(uncachedBlocks)
+                          input: buildResponsesApiInput(uncachedBlocks, config.targetLanguage)
                         }
                 };
               })();

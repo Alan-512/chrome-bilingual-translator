@@ -1,6 +1,7 @@
 import {
   DEFAULT_OPENAI_PROVIDER,
   GEMINI_PROVIDER,
+  SUPPORTED_TARGET_LANGUAGES,
   buildPersistedConfigRecord,
   getApiBaseUrlSecurityError,
   type PersistedExtensionConfigInput
@@ -20,6 +21,7 @@ type OptionsFormControls = {
   apiBaseUrl: HTMLInputElement;
   apiKey: HTMLInputElement;
   model: HTMLInputElement;
+  targetLanguage: HTMLSelectElement;
   translateTitles: HTMLInputElement;
   translateShortContentBlocks: HTMLInputElement;
   debugMode: HTMLInputElement;
@@ -33,6 +35,7 @@ function queryControls(doc: Document): OptionsFormControls {
   const apiBaseUrl = doc.querySelector<HTMLInputElement>("[name='apiBaseUrl']");
   const apiKey = doc.querySelector<HTMLInputElement>("[name='apiKey']");
   const model = doc.querySelector<HTMLInputElement>("[name='model']");
+  const targetLanguage = doc.querySelector<HTMLSelectElement>("[name='targetLanguage']");
   const translateTitles = doc.querySelector<HTMLInputElement>("[name='translateTitles']");
   const translateShortContentBlocks = doc.querySelector<HTMLInputElement>("[name='translateShortContentBlocks']");
   const debugMode = doc.querySelector<HTMLInputElement>("[name='debugMode']");
@@ -45,6 +48,7 @@ function queryControls(doc: Document): OptionsFormControls {
     !apiBaseUrl ||
     !apiKey ||
     !model ||
+    !targetLanguage ||
     !translateTitles ||
     !translateShortContentBlocks ||
     !debugMode ||
@@ -60,6 +64,7 @@ function queryControls(doc: Document): OptionsFormControls {
     apiBaseUrl,
     apiKey,
     model,
+    targetLanguage,
     translateTitles,
     translateShortContentBlocks,
     debugMode,
@@ -104,6 +109,9 @@ function collectFormInput(controls: OptionsFormControls): PersistedExtensionConf
     apiBaseUrl: controls.apiBaseUrl.value.trim(),
     apiKey: controls.apiKey.value.trim(),
     model: controls.model.value.trim(),
+    targetLanguage: SUPPORTED_TARGET_LANGUAGES.some((language) => language.code === controls.targetLanguage.value)
+      ? controls.targetLanguage.value
+      : "zh-CN",
     translateTitles: controls.translateTitles.checked,
     translateShortContentBlocks: controls.translateShortContentBlocks.checked,
     debugMode: controls.debugMode.checked
@@ -174,6 +182,7 @@ export async function mountOptionsPage(
   controls.apiBaseUrl.value = savedConfig.apiBaseUrl;
   controls.apiKey.value = savedConfig.apiKey;
   controls.model.value = savedConfig.model;
+  controls.targetLanguage.value = savedConfig.targetLanguage;
   controls.translateTitles.checked = savedConfig.translateTitles;
   controls.translateShortContentBlocks.checked = savedConfig.translateShortContentBlocks;
   controls.debugMode.checked = savedConfig.debugMode;

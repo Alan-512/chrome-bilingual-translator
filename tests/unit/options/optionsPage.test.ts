@@ -30,6 +30,14 @@ function renderOptionsDom() {
             <input name="model" type="text" />
           </label>
           <label>
+            Target language
+            <select name="targetLanguage">
+              <option value="zh-CN">Simplified Chinese</option>
+              <option value="en">English</option>
+              <option value="ja">Japanese</option>
+            </select>
+          </label>
+          <label>
             <input name="translateTitles" type="checkbox" />
             Translate titles
           </label>
@@ -72,7 +80,7 @@ describe("mountOptionsPage", () => {
         translateTitles: false,
         translateShortContentBlocks: true,
         debugMode: true,
-        targetLanguage: "zh-CN"
+        targetLanguage: "ja"
       }
     });
 
@@ -91,6 +99,7 @@ describe("mountOptionsPage", () => {
     expect((document.querySelector("[name='translateTitles']") as HTMLInputElement).checked).toBe(false);
     expect((document.querySelector("[name='translateShortContentBlocks']") as HTMLInputElement).checked).toBe(true);
     expect((document.querySelector("[name='debugMode']") as HTMLInputElement).checked).toBe(true);
+    expect((document.querySelector("[name='targetLanguage']") as HTMLSelectElement).value).toBe("ja");
   });
 
   it("saves submitted values and reports success", async () => {
@@ -108,6 +117,7 @@ describe("mountOptionsPage", () => {
     (document.querySelector("[name='translateTitles']") as HTMLInputElement).checked = true;
     (document.querySelector("[name='translateShortContentBlocks']") as HTMLInputElement).checked = false;
     (document.querySelector("[name='debugMode']") as HTMLInputElement).checked = true;
+    (document.querySelector("[name='targetLanguage']") as HTMLSelectElement).value = "en";
 
     document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await flushAsyncWork();
@@ -116,6 +126,7 @@ describe("mountOptionsPage", () => {
     expect(savedConfig.apiOrigin).toBe("https://api.test.dev");
     expect(savedConfig.translateShortContentBlocks).toBe(false);
     expect(savedConfig.debugMode).toBe(true);
+    expect(savedConfig.targetLanguage).toBe("en");
     expect(document.querySelector("[data-role='status']")?.textContent).toContain("saved");
     expect(document.querySelector("[data-role='toast']")?.textContent).toContain("Configuration saved");
     expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("success");
@@ -175,7 +186,7 @@ describe("mountOptionsPage", () => {
         translateTitles: true,
         translateShortContentBlocks: true,
         debugMode: false,
-        targetLanguage: "zh-CN"
+        targetLanguage: "ja"
       }
     });
     let observedConfig: {
@@ -185,6 +196,7 @@ describe("mountOptionsPage", () => {
       translateTitles: boolean;
       translateShortContentBlocks: boolean;
       debugMode: boolean;
+      targetLanguage: string;
     } | null = null;
 
     await mountOptionsPage(document, {
@@ -198,6 +210,7 @@ describe("mountOptionsPage", () => {
     (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://api.test.dev/v1/chat/completions";
     (document.querySelector("[name='apiKey']") as HTMLInputElement).value = "test-key";
     (document.querySelector("[name='model']") as HTMLInputElement).value = "test-model";
+    (document.querySelector("[name='targetLanguage']") as HTMLSelectElement).value = "en";
 
     document.querySelector("[data-role='test-api']")?.dispatchEvent(new Event("click", { bubbles: true }));
     await flushAsyncWork();
@@ -211,7 +224,8 @@ describe("mountOptionsPage", () => {
       model: "test-model",
       translateTitles: true,
       translateShortContentBlocks: true,
-      debugMode: false
+      debugMode: false,
+      targetLanguage: "en"
     });
     expect(document.querySelector("[data-role='toast']")?.textContent).toContain("API connection succeeded");
     expect(document.querySelector("[data-role='toast']")?.getAttribute("data-state")).toBe("success");

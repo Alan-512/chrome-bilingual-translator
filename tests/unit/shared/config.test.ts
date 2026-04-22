@@ -35,7 +35,8 @@ describe("config persistence", () => {
       model: "gpt-4.1-mini",
       translateTitles: false,
       translateShortContentBlocks: true,
-      debugMode: true
+      debugMode: true,
+      targetLanguage: "ja"
     });
 
     await saveExtensionConfig(storage, persisted);
@@ -50,8 +51,28 @@ describe("config persistence", () => {
       translateTitles: false,
       translateShortContentBlocks: true,
       debugMode: true,
-      targetLanguage: "zh-CN"
+      targetLanguage: "ja"
     });
+  });
+
+  it("falls back to Simplified Chinese when persisted target language is invalid", async () => {
+    const storage = createMemoryStorageArea({
+      extensionConfig: {
+        provider: "openai-compatible",
+        apiBaseUrl: "https://api.example.com/v1/chat/completions",
+        apiOrigin: "https://api.example.com",
+        apiKey: "test-key",
+        model: "gpt-5-mini",
+        translateTitles: true,
+        translateShortContentBlocks: true,
+        debugMode: false,
+        targetLanguage: "invalid-language"
+      }
+    });
+
+    const loaded = await loadExtensionConfig(storage);
+
+    expect(loaded.targetLanguage).toBe("zh-CN");
   });
 });
 

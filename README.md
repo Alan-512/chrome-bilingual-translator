@@ -2,12 +2,12 @@
 
 A Chrome Manifest V3 extension for on-demand bilingual webpage translation.
 
-It keeps the original text on the page and inserts Simplified Chinese translations below the source content. Translation is triggered manually from the browser context menu and progresses as you browse visible content.
+It keeps the original text on the page and inserts translated text below the source content. Translation is triggered manually from the browser context menu and progresses as you browse visible content.
 
 ## What It Does
 
 - Manually translates the current webpage from the right-click menu
-- Keeps the source text visible and inserts Chinese below it
+- Keeps the source text visible and inserts the selected target language below it
 - Supports lazy translation for visible content as you scroll
 - Supports dynamic pages that rerender while you browse
 - Supports:
@@ -79,8 +79,7 @@ Open the extension's `Extension options` page and fill in:
 - `API Base URL`
 - `API Key`
 - `Model`
-
-The target language is fixed to Simplified Chinese.
+- `Target language`
 
 ### Option 1: OpenAI Compatible
 
@@ -125,12 +124,13 @@ What happens next:
 - The extension translates visible content first
 - As you scroll, newly visible content continues translating
 - The original text stays in place
-- The Chinese translation is inserted below it
+- The selected target-language translation is inserted below it
 
 ## Settings
 
 The options page includes:
 
+- `Target language`
 - `Translate titles`
 - `Translate short content blocks`
 - `Debug mode`

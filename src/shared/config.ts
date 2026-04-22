@@ -1,9 +1,23 @@
 export const TARGET_LANGUAGE = "zh-CN" as const;
+export const SUPPORTED_TARGET_LANGUAGES = [
+  { code: "zh-CN", label: "Simplified Chinese", promptLabel: "Simplified Chinese" },
+  { code: "zh-TW", label: "Traditional Chinese", promptLabel: "Traditional Chinese" },
+  { code: "en", label: "English", promptLabel: "English" },
+  { code: "ja", label: "Japanese", promptLabel: "Japanese" },
+  { code: "ko", label: "Korean", promptLabel: "Korean" },
+  { code: "fr", label: "French", promptLabel: "French" },
+  { code: "de", label: "German", promptLabel: "German" },
+  { code: "es", label: "Spanish", promptLabel: "Spanish" },
+  { code: "pt", label: "Portuguese", promptLabel: "Portuguese" },
+  { code: "ru", label: "Russian", promptLabel: "Russian" },
+  { code: "ar", label: "Arabic", promptLabel: "Arabic" }
+] as const;
 
 export const DEFAULT_OPENAI_PROVIDER = "openai-compatible" as const;
 export const GEMINI_PROVIDER = "google-gemini" as const;
 
 export type ProviderType = typeof DEFAULT_OPENAI_PROVIDER | typeof GEMINI_PROVIDER;
+export type TargetLanguageCode = (typeof SUPPORTED_TARGET_LANGUAGES)[number]["code"];
 
 export type PersistedExtensionConfigInput = {
   provider: ProviderType;
@@ -13,11 +27,12 @@ export type PersistedExtensionConfigInput = {
   translateTitles: boolean;
   translateShortContentBlocks: boolean;
   debugMode: boolean;
+  targetLanguage?: TargetLanguageCode;
 };
 
 export type ExtensionConfig = PersistedExtensionConfigInput & {
   apiOrigin: string;
-  targetLanguage: typeof TARGET_LANGUAGE;
+  targetLanguage: TargetLanguageCode;
 };
 
 export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = {
@@ -45,8 +60,22 @@ export function buildPersistedConfigRecord(input: PersistedExtensionConfigInput)
   return {
     ...input,
     apiOrigin: normalizeApiBaseUrlToOrigin(input.apiBaseUrl),
-    targetLanguage: TARGET_LANGUAGE
+    targetLanguage: normalizeTargetLanguage(input.targetLanguage)
   };
+}
+
+export function normalizeTargetLanguage(targetLanguage: string | undefined): TargetLanguageCode {
+  return SUPPORTED_TARGET_LANGUAGES.some((language) => language.code === targetLanguage)
+    ? (targetLanguage as TargetLanguageCode)
+    : TARGET_LANGUAGE;
+}
+
+export function getTargetLanguagePromptLabel(targetLanguage: string | undefined): string {
+  return (
+    SUPPORTED_TARGET_LANGUAGES.find((language) => language.code === targetLanguage)?.promptLabel ??
+    SUPPORTED_TARGET_LANGUAGES.find((language) => language.code === TARGET_LANGUAGE)?.promptLabel ??
+    "Simplified Chinese"
+  );
 }
 
 export function getApiBaseUrlSecurityError(apiBaseUrl: string): string | null {
