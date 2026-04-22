@@ -49,29 +49,53 @@ async function sendLifecycleMessage(tabId: number, type: "page/activate" | "page
     type
   });
 
-  try {
-    const response = await chrome.tabs.sendMessage(tabId, {
-      type: "runtime/ping"
-    });
+  if (type === "page/activate") {
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, {
+        type: "runtime/ping"
+      });
 
-    if (!response?.ok) {
-      throw new Error("Content runtime did not acknowledge ping.");
+      if (!response?.ok) {
+        throw new Error("Content runtime did not acknowledge ping.");
+      }
+
+      await debugLog("lifecycle:dispatch:reused-runtime", {
+        tabId,
+        type
+      });
+    } catch {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["dist/content.js"]
+      });
+
+      await debugLog("lifecycle:dispatch:injected-runtime", {
+        tabId,
+        type
+      });
     }
+  } else {
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, {
+        type: "runtime/ping"
+      });
 
-    await debugLog("lifecycle:dispatch:reused-runtime", {
-      tabId,
-      type
-    });
-  } catch {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ["dist/content.js"]
-    });
+      if (!response?.ok) {
+        throw new Error("Content runtime did not acknowledge ping.");
+      }
 
-    await debugLog("lifecycle:dispatch:injected-runtime", {
-      tabId,
-      type
-    });
+      await debugLog("lifecycle:dispatch:reused-runtime", {
+        tabId,
+        type
+      });
+    } catch {
+      await debugLog("lifecycle:dispatch:missing-runtime", {
+        tabId,
+        type
+      });
+      await tabSessionStore.clear(tabId);
+      return;
+    }
   }
 
   const config = type === "page/activate" ? await loadExtensionConfig(localStorageArea) : null;
@@ -146,10 +170,14 @@ async function bootstrap() {
     }
 
     void (async () => {
+      const session = await tabSessionStore.get(tab.id);
+      const type = session.enabled ? "page/deactivate" : "page/activate";
       await debugLog("context-menu:clicked", {
-        tabId: tab.id
+        tabId: tab.id,
+        enabled: session.enabled,
+        type
       });
-      await sendLifecycleMessage(tab.id, "page/activate");
+      await sendLifecycleMessage(tab.id, type);
     })();
   });
 

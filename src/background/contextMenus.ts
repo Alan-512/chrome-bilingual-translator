@@ -2,6 +2,7 @@ import { type TabSessionRecord } from "./tabSessionStore";
 
 export const MENU_ID_TOGGLE_TRANSLATION = "toggle-page-translation";
 const TRANSLATE_MENU_TITLE = "Translate current webpage";
+const HIDE_TRANSLATION_MENU_TITLE = "Hide translated webpage";
 
 export type ContextMenuItem = {
   id: string;
@@ -24,8 +25,7 @@ export type ContextMenusOnShownApi = {
 };
 
 export function getToggleMenuTitle(session: Pick<TabSessionRecord, "enabled">): string {
-  void session;
-  return TRANSLATE_MENU_TITLE;
+  return session.enabled ? HIDE_TRANSLATION_MENU_TITLE : TRANSLATE_MENU_TITLE;
 }
 
 export function buildToggleMenuItem(session: Pick<TabSessionRecord, "enabled">): ContextMenuItem {

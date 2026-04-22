@@ -4,8 +4,6 @@ import type { PageClassification } from "../pageClassifier";
 const GOOGLE_RESULT_ROOT_SELECTOR = ".MjjYud, .g, [data-snc], .related-question-pair, .kp-wholepage, [data-shopping-result]";
 const GOOGLE_SNIPPET_SELECTOR =
   ".VwiC3b, .yXK7lf, .MUxGbd, .hgKElc, .s3v9rd, [data-shopping-result] [data-shopping-description], [data-shopping-result] [data-shopping-price]";
-const GOOGLE_TITLE_ANCHOR_SELECTOR =
-  ".yuRUbf, [data-header-feature], [data-snf], [data-shopping-result] a[href], [data-shopping-result] [data-shopping-link]";
 const GOOGLE_QUESTION_SELECTOR = ".related-question-pair [role='heading']";
 const GOOGLE_KNOWLEDGE_TITLE_SELECTOR = ".kp-wholepage [data-attrid='title']";
 const GOOGLE_KNOWLEDGE_DESCRIPTION_SELECTOR = ".kp-wholepage .kno-rdesc span";
@@ -105,11 +103,7 @@ export function collectGoogleSearchCandidateBlock(
   const isTitleElement = blockKind === "title";
   const isSnippetElement = blockKind === "snippet";
   const nestedSnippetParent = isSnippetElement ? element.parentElement?.closest<HTMLElement>(GOOGLE_SNIPPET_SELECTOR) : null;
-  const titleAnchorElement =
-    isTitleElement && element.closest<HTMLElement>(GOOGLE_TITLE_ANCHOR_SELECTOR)?.closest<HTMLElement>(GOOGLE_RESULT_ROOT_SELECTOR) ===
-      resultRoot
-      ? element.closest<HTMLElement>(GOOGLE_TITLE_ANCHOR_SELECTOR) ?? undefined
-      : undefined;
+  const titleAnchorElement = isTitleElement ? element : undefined;
 
   if (!blockKind) {
     return null;

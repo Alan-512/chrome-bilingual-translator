@@ -749,7 +749,7 @@ describe("collectCandidateBlocks", () => {
 
     const blocks = collectCandidateBlocks(root);
     const firstResult = document.querySelector(".MjjYud") as HTMLElement;
-    const firstTitleContainer = firstResult.querySelector(".yuRUbf") as HTMLElement;
+    const firstTitle = firstResult.querySelector("h3") as HTMLElement;
 
     expect(blocks.map((block) => block.sourceText)).toEqual([
       "SteamDB - Chrome Web Store",
@@ -763,7 +763,7 @@ describe("collectCandidateBlocks", () => {
     );
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(firstResult);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(firstResult);
-    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstTitleContainer);
+    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstTitle);
     expect(blocks[1]?.renderHint?.anchorElement).toBeUndefined();
   });
 

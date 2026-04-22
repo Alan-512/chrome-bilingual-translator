@@ -238,7 +238,10 @@ test("handles Google search result titles, snippets, videos, questions, and know
 
     await injectAndActivate(background, tab.id);
 
-    await expect(page.locator(".yuRUbf + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
+    await expect(page.locator(".MjjYud").first().locator("[data-bilingual-translator-owned='true']")).toHaveCount(2);
+    await expect(page.locator(".MjjYud").first().locator("[data-bilingual-translator-owned='true']").first()).toContainText(
+      "中文翻译"
+    );
     await expect(page.locator(".VwiC3b + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
     await expect(page.locator(".hgKElc + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
     await expect(page.locator(".s3v9rd + [data-bilingual-translator-owned='true']").first()).toContainText("中文翻译");
