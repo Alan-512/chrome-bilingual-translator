@@ -1,16 +1,16 @@
 export const TARGET_LANGUAGE = "zh-CN" as const;
 export const SUPPORTED_TARGET_LANGUAGES = [
-  { code: "zh-CN", label: "Simplified Chinese", promptLabel: "Simplified Chinese" },
-  { code: "zh-TW", label: "Traditional Chinese", promptLabel: "Traditional Chinese" },
+  { code: "zh-CN", label: "简体中文", promptLabel: "Simplified Chinese" },
+  { code: "zh-TW", label: "繁體中文", promptLabel: "Traditional Chinese" },
   { code: "en", label: "English", promptLabel: "English" },
-  { code: "ja", label: "Japanese", promptLabel: "Japanese" },
-  { code: "ko", label: "Korean", promptLabel: "Korean" },
-  { code: "fr", label: "French", promptLabel: "French" },
-  { code: "de", label: "German", promptLabel: "German" },
-  { code: "es", label: "Spanish", promptLabel: "Spanish" },
-  { code: "pt", label: "Portuguese", promptLabel: "Portuguese" },
-  { code: "ru", label: "Russian", promptLabel: "Russian" },
-  { code: "ar", label: "Arabic", promptLabel: "Arabic" }
+  { code: "ja", label: "日本語", promptLabel: "Japanese" },
+  { code: "ko", label: "한국어", promptLabel: "Korean" },
+  { code: "fr", label: "Français", promptLabel: "French" },
+  { code: "de", label: "Deutsch", promptLabel: "German" },
+  { code: "es", label: "Español", promptLabel: "Spanish" },
+  { code: "pt", label: "Português", promptLabel: "Portuguese" },
+  { code: "ru", label: "Русский", promptLabel: "Russian" },
+  { code: "ar", label: "العربية", promptLabel: "Arabic" }
 ] as const;
 
 export const DEFAULT_OPENAI_PROVIDER = "openai-compatible" as const;

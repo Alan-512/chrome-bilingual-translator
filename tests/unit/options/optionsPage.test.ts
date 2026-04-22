@@ -32,9 +32,9 @@ function renderOptionsDom() {
           <label>
             Target language
             <select name="targetLanguage">
-              <option value="zh-CN">Simplified Chinese</option>
+              <option value="zh-CN">简体中文</option>
               <option value="en">English</option>
-              <option value="ja">Japanese</option>
+              <option value="ja">日本語</option>
             </select>
           </label>
           <label>
