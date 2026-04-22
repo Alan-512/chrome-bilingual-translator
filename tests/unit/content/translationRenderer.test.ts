@@ -252,25 +252,28 @@ describe("renderTranslationBelow", () => {
     document.body.innerHTML = `
       <main>
         <article id="result">
-          <a id="title-link" href="/result">
-            <h3 id="title">Build with Google Antigravity, our new agentic platform</h3>
-          </a>
+          <div id="title-wrapper">
+            <a id="title-link" href="/result">
+              <h3 id="title">Build with Google Antigravity, our new agentic platform</h3>
+            </a>
+          </div>
           <p id="snippet">The agentic development platform that lets agents autonomously plan.</p>
         </article>
       </main>
     `;
     const title = document.getElementById("title") as HTMLHeadingElement;
     const titleLink = document.getElementById("title-link") as HTMLAnchorElement;
+    const titleWrapper = document.getElementById("title-wrapper") as HTMLDivElement;
 
     renderTranslationBelow(title, {
       blockId: "alpha",
       translationText: "使用 Google Antigravity 构建我们的新智能体平台",
-      anchorElement: titleLink
+      anchorElement: titleWrapper
     });
 
     expect(titleLink.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
-    expect(titleLink.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
-    expect((titleLink.nextElementSibling as HTMLElement).textContent).toBe(
+    expect(titleWrapper.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
+    expect((titleWrapper.nextElementSibling as HTMLElement).textContent).toBe(
       "使用 Google Antigravity 构建我们的新智能体平台"
     );
   });
