@@ -378,6 +378,31 @@ describe("collectCandidateBlocks", () => {
     );
   });
 
+  it("ignores wrapped Reddit detail body containers and keeps only the direct semantic body blocks", () => {
+    window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <a slot="title">Wrapped title</a>
+          <div data-post-click-location="text-body">
+            <div slot="text-body">
+              <p>First wrapped paragraph.</p>
+              <p>Second wrapped paragraph.</p>
+            </div>
+          </div>
+        </shreddit-post>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Wrapped title",
+      "First wrapped paragraph.",
+      "Second wrapped paragraph."
+    ]);
+  });
+
   it("does not merge generic fallback content on Reddit detail pages", () => {
     window.history.replaceState({}, "", "/r/ChatGPT/comments/abc123/example-post/");
     document.body.innerHTML = `

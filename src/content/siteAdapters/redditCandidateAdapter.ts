@@ -37,9 +37,18 @@ function buildRedditRehydrateKey(page: PageClassification, parts: string[]) {
 }
 
 function getBodyBlockIndex(bodyElement: HTMLElement, element: HTMLElement) {
-  const bodyBlocks = Array.from(bodyElement.querySelectorAll<HTMLElement>("p, li, blockquote"));
+  const bodyBlocks = getDetailBodyBlocks(bodyElement);
   const blockIndex = bodyBlocks.indexOf(element);
   return blockIndex >= 0 ? blockIndex : 0;
+}
+
+function getDetailBodyBlocks(bodyElement: HTMLElement): HTMLElement[] {
+  const semanticBlocks = Array.from(bodyElement.querySelectorAll<HTMLElement>(REDUNDANT_CONTAINER_SELECTOR));
+
+  return semanticBlocks.filter((block) => {
+    const semanticAncestor = block.parentElement?.closest<HTMLElement>(REDUNDANT_CONTAINER_SELECTOR);
+    return semanticAncestor == null || !bodyElement.contains(semanticAncestor);
+  });
 }
 
 function getListingTitleContainer(feedCard: HTMLElement): HTMLElement | null {
@@ -186,7 +195,25 @@ export function collectRedditCandidateBlock(
     };
   }
 
-  if (bodyElement && element !== bodyElement && bodyElement.contains(element)) {
+  if (bodyElement) {
+    const detailBodyBlocks = getDetailBodyBlocks(bodyElement);
+
+    if (detailBodyBlocks.length === 0 && element === bodyElement) {
+      return {
+        blockId: helpers.getStableBlockId(bodyElement),
+        element: bodyElement,
+        sourceText: getNormalizedText(bodyElement),
+        rehydrateKey: buildRedditRehydrateKey(page, ["post-body", "0", getNormalizedText(bodyElement)]),
+        renderHint: {
+          expansionRoot: feedCard
+        }
+      };
+    }
+
+    if (!detailBodyBlocks.includes(element)) {
+      return null;
+    }
+
     return {
       blockId: helpers.getStableBlockId(element),
       element,
