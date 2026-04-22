@@ -265,12 +265,12 @@ describe("renderTranslationBelow", () => {
     renderTranslationBelow(title, {
       blockId: "alpha",
       translationText: "使用 Google Antigravity 构建我们的新智能体平台",
-      anchorElement: title
+      anchorElement: titleLink
     });
 
-    expect(titleLink.querySelector("[data-bilingual-translator-owned='true']")).not.toBeNull();
-    expect(title.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
-    expect((title.nextElementSibling as HTMLElement).textContent).toBe(
+    expect(titleLink.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
+    expect(titleLink.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
+    expect((titleLink.nextElementSibling as HTMLElement).textContent).toBe(
       "使用 Google Antigravity 构建我们的新智能体平台"
     );
   });
