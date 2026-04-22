@@ -248,7 +248,7 @@ describe("renderTranslationBelow", () => {
     expect((metaRow.nextElementSibling as HTMLElement).textContent).toBe("SteamDB - Chrome 网上应用店");
   });
 
-  it("places heading translations outside wrapping search result links", () => {
+  it("places heading translations directly below search result headings even when they are wrapped in links", () => {
     document.body.innerHTML = `
       <main>
         <article id="result">
@@ -264,12 +264,13 @@ describe("renderTranslationBelow", () => {
 
     renderTranslationBelow(title, {
       blockId: "alpha",
-      translationText: "使用 Google Antigravity 构建我们的新智能体平台"
+      translationText: "使用 Google Antigravity 构建我们的新智能体平台",
+      anchorElement: title
     });
 
-    expect(titleLink.querySelector("[data-bilingual-translator-owned='true']")).toBeNull();
-    expect(titleLink.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
-    expect((titleLink.nextElementSibling as HTMLElement).textContent).toBe(
+    expect(titleLink.querySelector("[data-bilingual-translator-owned='true']")).not.toBeNull();
+    expect(title.nextElementSibling?.getAttribute("data-bilingual-translator-owned")).toBe("true");
+    expect((title.nextElementSibling as HTMLElement).textContent).toBe(
       "使用 Google Antigravity 构建我们的新智能体平台"
     );
   });

@@ -174,6 +174,10 @@ function resolveExplicitTranslationAnchor(element: HTMLElement): HTMLElement {
     return element;
   }
 
+  if (element.matches("h1, h2, h3, h4, h5, h6")) {
+    return element;
+  }
+
   const wrappingLink = element.closest<HTMLElement>("a[href]");
   if (wrappingLink && wrappingLink !== element && wrappingLink.contains(element)) {
     return wrappingLink;

@@ -9,6 +9,7 @@ export type CandidateBlock = {
   renderHint?: {
     anchorElement?: HTMLElement;
     expansionRoot?: HTMLElement;
+    skipLoadingPlaceholder?: boolean;
   };
 };
 

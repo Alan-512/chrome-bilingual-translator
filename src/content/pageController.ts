@@ -362,11 +362,13 @@ export function createPageController(doc: Document, dependencies: PageController
     const batchPromises = chunkBlocks(candidatesNeedingRequests, TRANSLATION_BATCH_SIZE).map((candidateBatch) => {
       candidateBatch.forEach((candidate) => {
         stateStore.set(candidate.blockId, "pending");
-        renderTranslationLoadingBelow(candidate.element, {
-          blockId: candidate.blockId,
-          anchorElement: candidate.renderHint?.anchorElement,
-          expansionRoot: candidate.renderHint?.expansionRoot
-        });
+        if (!candidate.renderHint?.skipLoadingPlaceholder) {
+          renderTranslationLoadingBelow(candidate.element, {
+            blockId: candidate.blockId,
+            anchorElement: candidate.renderHint?.anchorElement,
+            expansionRoot: candidate.renderHint?.expansionRoot
+          });
+        }
       });
       pendingBlockCount += candidateBatch.length;
 
