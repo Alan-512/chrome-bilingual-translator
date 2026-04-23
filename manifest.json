@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Chrome Bilingual Translator",
   "version": "0.1.0",
-  "description": "Translate webpage reading content into Simplified Chinese while preserving the original text.",
+  "description": "Translate webpage reading content into your selected target language while preserving the original text.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1LMxG4NmndX6oa5dRwBEl/eHmRlGzHPhkgq+VM+nvnXEI5n6N5kJeK4a5fTxpYzx752M8du1a7h2OH0MW1yhXW0Tolj0iJ8TnQQwKGp0OkT63rqDnSxMXuX3EUsYBBkmBobG5ucDVDe3YTl5MFQHMThseH1yzuTdXzOs/Zt3Uiuz1XsZX9cHlyeUIwinJQrgL2lx5uk5xcTuPODUs2h4/F7EYLtSJAfqp6N4oXC5gK3fHItmpOHO88cUplL9rnGwyae2gobEfwzmIbk3BJ2TpxPkbAXVYFeGYsLp+v0+DzTzl64hcLevFmud2sS8ZE95p9UxaiiKcxvws84dVdbDwQIDAQAB",
   "icons": {
     "16": "assets/icon-16.png",
