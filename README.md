@@ -10,6 +10,7 @@ It keeps the original text on the page and inserts translated text below the sou
 - Keeps the source text visible and inserts the selected target language below it
 - Supports lazy translation for visible content as you scroll
 - Supports dynamic pages that rerender while you browse
+- Supports multiple target languages from the options page
 - Supports:
   - `OpenAI Compatible`
   - `Google Gemini`
@@ -54,6 +55,22 @@ It works on normal article pages, feed-style pages, documentation pages, reposit
 
 After that, the extension is installed locally.
 
+## Repository Layout
+
+The public repository keeps source files, assets, and tests only.
+
+- `src/`: extension source code
+- `assets/`: icon assets
+- `tests/`: unit, integration, and browser regression tests
+- `dist/`: generated runtime bundles after `npm run build`
+- `release/`: generated unpacked extension after `npm run build`
+
+Notes:
+
+- `dist/` and `release/` are build outputs and are intentionally ignored by git
+- local artifacts such as `node_modules/`, `test-results/`, and `playwright-report/` are also ignored
+- provider API keys are never committed; configure them locally in the extension options page
+
 ## Share With Other People
 
 For small-scale sharing, the practical way is:
@@ -71,6 +88,8 @@ For small-scale sharing, the practical way is:
 
 This is easier than asking them to build from scratch, and it avoids shipping the full development workspace with `node_modules`, tests, and other non-extension files. Users still need to configure their own API.
 
+If you make the repository public, other developers can also clone it, run `npm install && npm run build`, and then load the generated `release/` folder in Chrome.
+
 ## Configuration
 
 Open the extension's `Extension options` page and fill in:
@@ -80,6 +99,20 @@ Open the extension's `Extension options` page and fill in:
 - `API Key`
 - `Model`
 - `Target language`
+
+Currently supported target languages:
+
+- `简体中文`
+- `繁體中文`
+- `English`
+- `日本語`
+- `한국어`
+- `Français`
+- `Deutsch`
+- `Español`
+- `Português`
+- `Русский`
+- `العربية`
 
 ### Option 1: OpenAI Compatible
 
