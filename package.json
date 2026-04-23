@@ -2,6 +2,7 @@
   "name": "chrome-bilingual-translator",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "A Chrome extension for on-demand bilingual webpage translation.",
   "scripts": {
     "build": "node esbuild.config.mjs",
