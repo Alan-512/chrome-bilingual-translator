@@ -1,4 +1,4 @@
-import { DEFAULT_EXTENSION_CONFIG, normalizeTargetLanguage, type ExtensionConfig } from "./config";
+import { DEFAULT_EXTENSION_CONFIG, buildPersistedConfigRecord, normalizeTargetLanguage, type ExtensionConfig } from "./config";
 
 const CONFIG_STORAGE_KEY = "extensionConfig";
 
@@ -52,8 +52,14 @@ export async function loadExtensionConfig(storageArea: StorageAreaLike): Promise
     ...(config as Partial<ExtensionConfig>)
   };
 
-  return {
-    ...mergedConfig,
+  return buildPersistedConfigRecord({
+    provider: mergedConfig.provider,
+    apiBaseUrl: mergedConfig.apiBaseUrl,
+    apiKey: mergedConfig.apiKey,
+    model: mergedConfig.model,
+    translateTitles: mergedConfig.translateTitles,
+    translateShortContentBlocks: mergedConfig.translateShortContentBlocks,
+    debugMode: mergedConfig.debugMode,
     targetLanguage: normalizeTargetLanguage(mergedConfig.targetLanguage)
-  };
+  });
 }

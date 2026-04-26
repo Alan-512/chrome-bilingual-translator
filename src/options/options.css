@@ -81,6 +81,12 @@ h1 {
     background-color 140ms ease;
 }
 
+.field-note {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a5a25;
+}
+
 .field select {
   appearance: none;
   cursor: pointer;
@@ -110,6 +116,12 @@ h1 {
   outline: none;
   border-color: rgba(214, 110, 34, 0.6);
   box-shadow: 0 0 0 4px rgba(234, 158, 67, 0.16);
+}
+
+[data-role="api-base-url-field"][data-locked="true"] input {
+  background: #f5f1e8;
+  color: #5e6673;
+  cursor: not-allowed;
 }
 
 .toggle {

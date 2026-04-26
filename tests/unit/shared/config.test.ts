@@ -96,6 +96,22 @@ describe("API base URL normalization", () => {
   it("returns an empty string for invalid input", () => {
     expect(normalizeApiBaseUrlToOrigin("not a valid url")).toBe("");
   });
+
+  it("forces the built-in Gemini base URL when provider is google-gemini", () => {
+    const persisted = buildPersistedConfigRecord({
+      provider: "google-gemini",
+      apiBaseUrl: "https://api.example.com/anything",
+      apiKey: "gemini-key",
+      model: "gemini-3.1-flash-lite-preview",
+      translateTitles: true,
+      translateShortContentBlocks: true,
+      debugMode: false,
+      targetLanguage: "en"
+    });
+
+    expect(persisted.apiBaseUrl).toBe("https://generativelanguage.googleapis.com/v1beta");
+    expect(persisted.apiOrigin).toBe("https://generativelanguage.googleapis.com");
+  });
 });
 
 describe("API base URL security validation", () => {

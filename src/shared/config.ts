@@ -15,6 +15,7 @@ export const SUPPORTED_TARGET_LANGUAGES = [
 
 export const DEFAULT_OPENAI_PROVIDER = "openai-compatible" as const;
 export const GEMINI_PROVIDER = "google-gemini" as const;
+export const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta" as const;
 
 export type ProviderType = typeof DEFAULT_OPENAI_PROVIDER | typeof GEMINI_PROVIDER;
 export type TargetLanguageCode = (typeof SUPPORTED_TARGET_LANGUAGES)[number]["code"];
@@ -57,11 +58,22 @@ export function normalizeApiBaseUrlToOrigin(apiBaseUrl: string): string {
 }
 
 export function buildPersistedConfigRecord(input: PersistedExtensionConfigInput): ExtensionConfig {
+  const resolvedApiBaseUrl = resolveApiBaseUrlForProvider(input.provider, input.apiBaseUrl);
+
   return {
     ...input,
-    apiOrigin: normalizeApiBaseUrlToOrigin(input.apiBaseUrl),
+    apiBaseUrl: resolvedApiBaseUrl,
+    apiOrigin: normalizeApiBaseUrlToOrigin(resolvedApiBaseUrl),
     targetLanguage: normalizeTargetLanguage(input.targetLanguage)
   };
+}
+
+export function resolveApiBaseUrlForProvider(provider: ProviderType, apiBaseUrl: string): string {
+  if (provider === GEMINI_PROVIDER) {
+    return GEMINI_API_BASE_URL;
+  }
+
+  return apiBaseUrl.trim();
 }
 
 export function normalizeTargetLanguage(targetLanguage: string | undefined): TargetLanguageCode {
@@ -106,7 +118,7 @@ export function getMissingConfigFields(config: ExtensionConfig): Array<keyof Per
     missingFields.push("provider");
   }
 
-  if (!config.apiBaseUrl.trim()) {
+  if (config.provider !== GEMINI_PROVIDER && !config.apiBaseUrl.trim()) {
     missingFields.push("apiBaseUrl");
   }
 
