@@ -17,10 +17,9 @@ function renderOptionsDom() {
               <option value="google-gemini">Google Gemini</option>
             </select>
           </label>
-          <label data-role="api-base-url-field">
+          <label>
             API Base URL
             <input name="apiBaseUrl" type="url" />
-            <small data-role="api-base-url-note" hidden>Google Gemini uses a built-in API base URL.</small>
           </label>
           <label>
             API Key
@@ -294,27 +293,16 @@ describe("mountOptionsPage", () => {
 
     const provider = document.querySelector("[name='provider']") as HTMLSelectElement;
     const apiBaseUrlInput = document.querySelector("[name='apiBaseUrl']") as HTMLInputElement;
-    const apiBaseUrlNote = document.querySelector("[data-role='api-base-url-note']") as HTMLElement;
-
-    apiBaseUrlInput.value = "https://api.openai.com/v1/chat/completions";
     provider.value = "google-gemini";
     provider.dispatchEvent(new Event("change", { bubbles: true }));
 
     expect(apiBaseUrlInput.value).toBe("https://generativelanguage.googleapis.com/v1beta");
-    expect(apiBaseUrlInput.disabled).toBe(true);
-    expect(apiBaseUrlNote.hidden).toBe(false);
     expect((document.querySelector("[name='model']") as HTMLInputElement).value).toBe(
       "gemini-3.1-flash-lite-preview"
     );
-
-    provider.value = "openai-compatible";
-    provider.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(apiBaseUrlInput.disabled).toBe(false);
-    expect(apiBaseUrlInput.value).toBe("https://api.openai.com/v1/chat/completions");
-    expect(apiBaseUrlNote.hidden).toBe(true);
   });
 
-  it("uses built-in Gemini base URL even when input is empty", async () => {
+  it("uses built-in Gemini base URL when provider is Gemini and URL is empty", async () => {
     const storage = createMemoryStorageArea();
 
     await mountOptionsPage(document, {
@@ -338,5 +326,30 @@ describe("mountOptionsPage", () => {
     const savedConfig = await loadExtensionConfig(storage);
     expect(savedConfig.provider).toBe("google-gemini");
     expect(savedConfig.apiBaseUrl).toBe("https://generativelanguage.googleapis.com/v1beta");
+  });
+
+  it("keeps custom Gemini base URL when user explicitly sets one", async () => {
+    const storage = createMemoryStorageArea();
+
+    await mountOptionsPage(document, {
+      storageArea: storage,
+      requestApiOriginPermission: async () => true,
+      testApiConnection: async () => undefined
+    });
+
+    const provider = document.querySelector("[name='provider']") as HTMLSelectElement;
+    provider.value = "google-gemini";
+    provider.dispatchEvent(new Event("change", { bubbles: true }));
+
+    (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://custom-gemini-host.example.com/v1beta";
+    (document.querySelector("[name='apiKey']") as HTMLInputElement).value = "gemini-key";
+    (document.querySelector("[name='model']") as HTMLInputElement).value = "gemini-3.1-flash-lite-preview";
+
+    document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await flushAsyncWork();
+
+    const savedConfig = await loadExtensionConfig(storage);
+    expect(savedConfig.provider).toBe("google-gemini");
+    expect(savedConfig.apiBaseUrl).toBe("https://custom-gemini-host.example.com/v1beta");
   });
 });

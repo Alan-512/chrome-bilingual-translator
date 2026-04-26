@@ -69,11 +69,13 @@ export function buildPersistedConfigRecord(input: PersistedExtensionConfigInput)
 }
 
 export function resolveApiBaseUrlForProvider(provider: ProviderType, apiBaseUrl: string): string {
-  if (provider === GEMINI_PROVIDER) {
+  const trimmed = apiBaseUrl.trim();
+
+  if (provider === GEMINI_PROVIDER && !trimmed) {
     return GEMINI_API_BASE_URL;
   }
 
-  return apiBaseUrl.trim();
+  return trimmed;
 }
 
 export function normalizeTargetLanguage(targetLanguage: string | undefined): TargetLanguageCode {
@@ -118,7 +120,7 @@ export function getMissingConfigFields(config: ExtensionConfig): Array<keyof Per
     missingFields.push("provider");
   }
 
-  if (config.provider !== GEMINI_PROVIDER && !config.apiBaseUrl.trim()) {
+  if (!config.apiBaseUrl.trim()) {
     missingFields.push("apiBaseUrl");
   }
 

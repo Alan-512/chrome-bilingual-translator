@@ -20,8 +20,6 @@ type OptionsFormControls = {
   form: HTMLFormElement;
   testApi: HTMLButtonElement;
   provider: HTMLSelectElement;
-  apiBaseUrlField: HTMLElement;
-  apiBaseUrlNote: HTMLElement;
   apiBaseUrl: HTMLInputElement;
   apiKey: HTMLInputElement;
   model: HTMLInputElement;
@@ -36,8 +34,6 @@ function queryControls(doc: Document): OptionsFormControls {
   const form = doc.querySelector<HTMLFormElement>("[data-role='options-form']");
   const testApi = doc.querySelector<HTMLButtonElement>("[data-role='test-api']");
   const provider = doc.querySelector<HTMLSelectElement>("[name='provider']");
-  const apiBaseUrlField = doc.querySelector<HTMLElement>("[data-role='api-base-url-field']");
-  const apiBaseUrlNote = doc.querySelector<HTMLElement>("[data-role='api-base-url-note']");
   const apiBaseUrl = doc.querySelector<HTMLInputElement>("[name='apiBaseUrl']");
   const apiKey = doc.querySelector<HTMLInputElement>("[name='apiKey']");
   const model = doc.querySelector<HTMLInputElement>("[name='model']");
@@ -51,8 +47,6 @@ function queryControls(doc: Document): OptionsFormControls {
     !form ||
     !testApi ||
     !provider ||
-    !apiBaseUrlField ||
-    !apiBaseUrlNote ||
     !apiBaseUrl ||
     !apiKey ||
     !model ||
@@ -69,8 +63,6 @@ function queryControls(doc: Document): OptionsFormControls {
     form,
     testApi,
     provider,
-    apiBaseUrlField,
-    apiBaseUrlNote,
     apiBaseUrl,
     apiKey,
     model,
@@ -132,26 +124,13 @@ function collectFormInput(controls: OptionsFormControls): PersistedExtensionConf
 
 function applyProviderPreset(controls: OptionsFormControls) {
   if (controls.provider.value === GEMINI_PROVIDER) {
-    if (controls.apiBaseUrl.value.trim() && controls.apiBaseUrl.value.trim() !== GEMINI_API_BASE_URL) {
-      controls.apiBaseUrl.dataset.lastOpenAiBaseUrl = controls.apiBaseUrl.value.trim();
+    if (!controls.apiBaseUrl.value.trim()) {
+      controls.apiBaseUrl.value = GEMINI_API_BASE_URL;
     }
-
-    controls.apiBaseUrl.value = GEMINI_API_BASE_URL;
-    controls.apiBaseUrl.disabled = true;
-    controls.apiBaseUrlField.dataset.locked = "true";
-    controls.apiBaseUrlNote.hidden = false;
 
     if (!controls.model.value.trim()) {
       controls.model.value = "gemini-3.1-flash-lite-preview";
     }
-    return;
-  }
-
-  controls.apiBaseUrl.disabled = false;
-  controls.apiBaseUrlField.dataset.locked = "false";
-  controls.apiBaseUrlNote.hidden = true;
-  if (controls.apiBaseUrl.value.trim() === GEMINI_API_BASE_URL) {
-    controls.apiBaseUrl.value = controls.apiBaseUrl.dataset.lastOpenAiBaseUrl ?? "";
   }
 }
 

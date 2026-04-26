@@ -97,10 +97,10 @@ describe("API base URL normalization", () => {
     expect(normalizeApiBaseUrlToOrigin("not a valid url")).toBe("");
   });
 
-  it("forces the built-in Gemini base URL when provider is google-gemini", () => {
+  it("uses the built-in Gemini base URL when provider is google-gemini and URL is empty", () => {
     const persisted = buildPersistedConfigRecord({
       provider: "google-gemini",
-      apiBaseUrl: "https://api.example.com/anything",
+      apiBaseUrl: "",
       apiKey: "gemini-key",
       model: "gemini-3.1-flash-lite-preview",
       translateTitles: true,
@@ -111,6 +111,22 @@ describe("API base URL normalization", () => {
 
     expect(persisted.apiBaseUrl).toBe("https://generativelanguage.googleapis.com/v1beta");
     expect(persisted.apiOrigin).toBe("https://generativelanguage.googleapis.com");
+  });
+
+  it("keeps explicit Gemini base URL when provided", () => {
+    const persisted = buildPersistedConfigRecord({
+      provider: "google-gemini",
+      apiBaseUrl: "https://custom-gemini-host.example.com/v1beta",
+      apiKey: "gemini-key",
+      model: "gemini-3.1-flash-lite-preview",
+      translateTitles: true,
+      translateShortContentBlocks: true,
+      debugMode: false,
+      targetLanguage: "en"
+    });
+
+    expect(persisted.apiBaseUrl).toBe("https://custom-gemini-host.example.com/v1beta");
+    expect(persisted.apiOrigin).toBe("https://custom-gemini-host.example.com");
   });
 });
 
