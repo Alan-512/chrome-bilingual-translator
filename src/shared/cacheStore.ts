@@ -18,18 +18,27 @@ export class PersistentTranslationCache {
     this.storageArea = storageArea;
   }
 
-  async get(sourceText: string): Promise<string | null> {
+  async get(sourceText: string, targetLanguage?: string): Promise<string | null> {
     const cache = await this.loadCache();
     const normalizedSourceText = normalizeSourceText(sourceText);
-    return cache[hashNormalizedText(normalizedSourceText)] ?? null;
+    const hash = hashNormalizedText(normalizedSourceText);
+    if (targetLanguage) {
+      const key = `${targetLanguage}:${hash}`;
+      if (cache[key] !== undefined) {
+        return cache[key];
+      }
+    }
+    return cache[hash] ?? null;
   }
 
-  async setMany(records: CachedTranslationRecord[]): Promise<void> {
+  async setMany(records: CachedTranslationRecord[], targetLanguage?: string): Promise<void> {
     const cache = await this.loadCache();
 
     for (const record of records) {
       const normalizedSourceText = normalizeSourceText(record.sourceText);
-      cache[hashNormalizedText(normalizedSourceText)] = record.translation;
+      const hash = hashNormalizedText(normalizedSourceText);
+      const key = targetLanguage ? `${targetLanguage}:${hash}` : hash;
+      cache[key] = record.translation;
     }
 
     await this.storageArea.set({ [CACHE_STORAGE_KEY]: cache });

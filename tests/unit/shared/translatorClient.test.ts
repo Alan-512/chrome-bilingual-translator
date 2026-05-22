@@ -183,6 +183,93 @@ describe("translator client", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("isolates cached translations by target language", async () => {
+    const cache = new PersistentTranslationCache(createMemoryStorageArea());
+    // Seed translation for "Hello world" to Japanese
+    await cache.setMany(
+      [
+        {
+          sourceText: "Hello world",
+          translation: "こんにちは世界"
+        }
+      ],
+      "ja"
+    );
+
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  alpha: "Hello world translated to French"
+                })
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache
+    });
+
+    // 1. Request translation for French (should NOT hit Japanese cache, should make network request)
+    const resultFr = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
+        apiBaseUrl: "https://api.example.com/v1/chat/completions",
+        apiKey: "secret-key",
+        model: "gpt-5-mini",
+        translateTitles: true,
+        translateShortContentBlocks: true,
+        targetLanguage: "fr"
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(resultFr).toEqual({ alpha: "Hello world translated to French" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // 2. Request translation for Japanese (should hit cache, should NOT make network request)
+    const resultJa = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
+        apiBaseUrl: "https://api.example.com/v1/chat/completions",
+        apiKey: "secret-key",
+        model: "gpt-5-mini",
+        translateTitles: true,
+        translateShortContentBlocks: true,
+        targetLanguage: "ja"
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(resultJa).toEqual({ alpha: "こんにちは世界" });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // Still 1 from the French call
+
+    // 3. Request translation for French again (should hit cache now, should NOT make network request)
+    const resultFrCached = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
+        apiBaseUrl: "https://api.example.com/v1/chat/completions",
+        apiKey: "secret-key",
+        model: "gpt-5-mini",
+        translateTitles: true,
+        translateShortContentBlocks: true,
+        targetLanguage: "fr"
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(resultFrCached).toEqual({ alpha: "Hello world translated to French" });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // Still 1
+  });
+
   it("fails fast on non-ok http responses", async () => {
     const fetchMock = vi.fn(async () => new Response("upstream failure", { status: 429, statusText: "Too Many Requests" }));
 
@@ -507,5 +594,106 @@ describe("translator client", () => {
     ).rejects.toThrow(
       /network request to https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.1-flash-lite-preview:generateContent failed/i
     );
+  });
+
+  it("builds a selection translation request and returns the resulting string", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body.model).toBe("gpt-5-mini");
+      expect(body.messages[0].role).toBe("system");
+      expect(body.messages[0].content).toContain("translation");
+      const userContent = JSON.parse(body.messages[1].content);
+      expect(userContent.selectedText).toBe("bonjour");
+      expect(userContent.surroundingContext).toBe("bonjour tout le monde");
+
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "hello"
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateOrExplainSelection({
+      config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
+        apiBaseUrl: "https://api.example.com/v1/chat/completions",
+        apiKey: "secret-key",
+        model: "gpt-5-mini",
+        translateTitles: true,
+        translateShortContentBlocks: true,
+        targetLanguage: "en"
+      }),
+      action: "translate",
+      selectionText: "bonjour",
+      contextText: "bonjour tout le monde"
+    });
+
+    expect(result).toBe("hello");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports selection native Google Gemini generateContent requests", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
+      );
+      const body = JSON.parse(String(init?.body));
+      expect(body.systemInstruction.parts[0].text).toContain("translation");
+      const userContent = JSON.parse(body.contents[0].parts[0].text);
+      expect(userContent.selectedText).toBe("bonjour");
+      expect(userContent.surroundingContext).toBe("bonjour tout le monde");
+
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: "hello"
+                  }
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateOrExplainSelection({
+      config: buildPersistedConfigRecord({
+        provider: "google-gemini",
+        apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+        apiKey: "secret-key",
+        model: "gemini-3.1-flash-lite-preview",
+        translateTitles: true,
+        translateShortContentBlocks: true,
+        targetLanguage: "en"
+      }),
+      action: "translate",
+      selectionText: "bonjour",
+      contextText: "bonjour tout le monde"
+    });
+
+    expect(result).toBe("hello");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

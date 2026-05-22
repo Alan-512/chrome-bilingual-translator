@@ -12,6 +12,12 @@ export type TranslatorClient = {
   testConnection(input: {
     config: ExtensionConfig;
   }): Promise<void>;
+  translateOrExplainSelection(input: {
+    config: ExtensionConfig;
+    action: "translate" | "explain";
+    selectionText: string;
+    contextText: string;
+  }): Promise<string>;
 };
 
 type CreateTranslatorClientOptions = {
@@ -318,6 +324,141 @@ function toNetworkErrorMessage(url: string) {
   return `Network request to ${url} failed before receiving a response. Check whether this API host is reachable and not blocked by proxy, firewall, DNS, or TLS issues.`;
 }
 
+function buildGeminiSelectionBody(
+  model: string,
+  action: "translate" | "explain",
+  selectionText: string,
+  contextText: string,
+  targetLanguage: TargetLanguageCode
+) {
+  const targetLanguageLabel = getTargetLanguagePromptLabel(targetLanguage);
+  let systemText = "";
+  if (action === "translate") {
+    systemText = `You are a professional translation assistant. Translate the user's selected text into ${targetLanguageLabel}. Use the provided surrounding context to resolve any ambiguity, homophones, or semantic tone, but do not translate or include the context in the output. The response should only be the translation of the selected text itself, without any extra explanation, markdown wrapping, or conversational filler.`;
+  } else {
+    systemText = `You are an expert bilingual dictionary and vocabulary assistant. Explain the meaning of the selected word, phrase, or sentence in detail. Base your explanation on the surrounding context to ensure accurate semantic understanding. You must output the explanation in ${targetLanguageLabel}. Be precise, concise, and structured, explaining any nuances or context-specific meanings. Return only the explanation without conversational filler.`;
+  }
+
+  return {
+    ...(buildGeminiThinkingConfig(model)
+      ? {
+          generationConfig: buildGeminiThinkingConfig(model)
+        }
+      : {}),
+    systemInstruction: {
+      parts: [
+        {
+          text: systemText
+        }
+      ]
+    },
+    contents: [
+      {
+        parts: [
+          {
+            text: JSON.stringify(
+              {
+                task: action === "translate"
+                  ? `Translate the selected text into ${targetLanguageLabel}.`
+                  : `Explain the selected text in ${targetLanguageLabel}, leveraging the surrounding context.`,
+                targetLanguage: targetLanguageLabel,
+                selectedText: selectionText,
+                surroundingContext: contextText
+              },
+              null,
+              2
+            )
+          }
+        ]
+      }
+    ]
+  };
+}
+
+function buildSelectionChatMessages(
+  action: "translate" | "explain",
+  selectionText: string,
+  contextText: string,
+  targetLanguage: TargetLanguageCode
+) {
+  const targetLanguageLabel = getTargetLanguagePromptLabel(targetLanguage);
+  let systemText = "";
+  if (action === "translate") {
+    systemText = `You are a professional translation assistant. Translate the user's selected text into ${targetLanguageLabel}. Use the provided surrounding context to resolve any ambiguity, homophones, or semantic tone, but do not translate or include the context in the output. The response should only be the translation of the selected text itself, without any extra explanation, markdown wrapping, or conversational filler.`;
+  } else {
+    systemText = `You are an expert bilingual dictionary and vocabulary assistant. Explain the meaning of the selected word, phrase, or sentence in detail. Base your explanation on the surrounding context to ensure accurate semantic understanding. You must output the explanation in ${targetLanguageLabel}. Be precise, concise, and structured, explaining any nuances or context-specific meanings. Return only the explanation without conversational filler.`;
+  }
+
+  return [
+    {
+      role: "system",
+      content: systemText
+    },
+    {
+      role: "user",
+      content: JSON.stringify(
+        {
+          task: action === "translate"
+            ? `Translate the selected text into ${targetLanguageLabel}.`
+            : `Explain the selected text in ${targetLanguageLabel}, leveraging the surrounding context.`,
+          targetLanguage: targetLanguageLabel,
+          selectedText: selectionText,
+          surroundingContext: contextText
+        },
+        null,
+        2
+      )
+    }
+  ];
+}
+
+function buildSelectionResponsesApiInput(
+  action: "translate" | "explain",
+  selectionText: string,
+  contextText: string,
+  targetLanguage: TargetLanguageCode
+) {
+  const targetLanguageLabel = getTargetLanguagePromptLabel(targetLanguage);
+  let systemText = "";
+  if (action === "translate") {
+    systemText = `You are a professional translation assistant. Translate the user's selected text into ${targetLanguageLabel}. Use the provided surrounding context to resolve any ambiguity, homophones, or semantic tone, but do not translate or include the context in the output. The response should only be the translation of the selected text itself, without any extra explanation, markdown wrapping, or conversational filler.`;
+  } else {
+    systemText = `You are an expert bilingual dictionary and vocabulary assistant. Explain the meaning of the selected word, phrase, or sentence in detail. Base your explanation on the surrounding context to ensure accurate semantic understanding. You must output the explanation in ${targetLanguageLabel}. Be precise, concise, and structured, explaining any nuances or context-specific meanings. Return only the explanation without conversational filler.`;
+  }
+
+  return [
+    {
+      role: "system",
+      content: [
+        {
+          type: "input_text",
+          text: systemText
+        }
+      ]
+    },
+    {
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: JSON.stringify(
+            {
+              task: action === "translate"
+                ? `Translate the selected text into ${targetLanguageLabel}.`
+                : `Explain the selected text in ${targetLanguageLabel}, leveraging the surrounding context.`,
+              targetLanguage: targetLanguageLabel,
+              selectedText: selectionText,
+              surroundingContext: contextText
+            },
+            null,
+            2
+          )
+        }
+      ]
+    }
+  ];
+}
+
 export function createTranslatorClient(options: CreateTranslatorClientOptions): TranslatorClient {
   const timeoutMs = options.timeoutMs ?? 30_000;
 
@@ -327,7 +468,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
       const uncachedBlocks: TranslationBlockInput[] = [];
 
       for (const block of blocks) {
-        const cachedTranslation = await options.cache.get(block.sourceText);
+        const cachedTranslation = await options.cache.get(block.sourceText, config.targetLanguage);
         if (cachedTranslation) {
           result[block.blockId] = cachedTranslation;
           continue;
@@ -434,7 +575,8 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           uncachedBlocks.map((block) => ({
             sourceText: block.sourceText,
             translation: translatedBlocks[block.blockId]
-          }))
+          })),
+          config.targetLanguage
         );
 
         return {
@@ -483,6 +625,120 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
 
         if (error instanceof TypeError) {
           throw new Error(toNetworkErrorMessage(request.url));
+        }
+
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
+
+    async translateOrExplainSelection({ config, action, selectionText, contextText }) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const request =
+          config.provider === "google-gemini"
+            ? {
+                mode: "gemini" as const,
+                url: `${config.apiBaseUrl.replace(/\/+$/, "")}/models/${config.model}:generateContent`,
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": config.apiKey
+                },
+                body: buildGeminiSelectionBody(
+                  config.model,
+                  action,
+                  selectionText,
+                  contextText,
+                  config.targetLanguage
+                )
+              }
+            : (() => {
+                const resolvedApi = resolveApiMode(config.apiBaseUrl);
+
+                return {
+                  mode: resolvedApi.mode,
+                  url: resolvedApi.url,
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${config.apiKey}`
+                  },
+                  body:
+                    resolvedApi.mode === "chat"
+                      ? {
+                          model: config.model,
+                          ...(isOpenAiOfficialUrl(resolvedApi.url)
+                            ? {
+                                reasoning: {
+                                  effort: "low"
+                                }
+                              }
+                            : {}),
+                          messages: buildSelectionChatMessages(
+                            action,
+                            selectionText,
+                            contextText,
+                            config.targetLanguage
+                          )
+                        }
+                      : {
+                          model: config.model,
+                          ...(isOpenAiOfficialUrl(resolvedApi.url)
+                            ? {
+                                reasoning: {
+                                  effort: "low"
+                                }
+                              }
+                            : {}),
+                          input: buildSelectionResponsesApiInput(
+                            action,
+                            selectionText,
+                            contextText,
+                            config.targetLanguage
+                          )
+                        }
+                };
+              })();
+
+        const response = await options.fetchImpl(request.url, {
+          method: "POST",
+          headers: request.headers,
+          body: JSON.stringify(request.body),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(await readApiErrorMessage(response));
+        }
+
+        const responseBody = (await response.json()) as OpenAiCompatibleResponse &
+          ResponsesApiResponse &
+          GeminiGenerateContentResponse;
+        const content =
+          request.mode === "gemini"
+            ? extractGeminiText(responseBody)
+            : request.mode === "chat"
+              ? responseBody.choices?.[0]?.message?.content
+              : extractResponsesApiText(responseBody);
+
+        if (!content) {
+          throw new Error("Selection translation/explanation response did not include a content payload.");
+        }
+
+        return content.trim();
+      } catch (error) {
+        if (controller.signal.aborted || isAbortError(error)) {
+          throw new Error(toTimeoutErrorMessage(timeoutMs));
+        }
+
+        if (error instanceof TypeError) {
+          const failedUrl =
+            config.provider === "google-gemini"
+              ? `${config.apiBaseUrl.replace(/\/+$/, "")}/models/${config.model}:generateContent`
+              : resolveApiMode(config.apiBaseUrl).url;
+          throw new Error(toNetworkErrorMessage(failedUrl));
         }
 
         throw error;

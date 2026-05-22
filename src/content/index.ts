@@ -1,5 +1,6 @@
 import { createPageController } from "./pageController";
 import { isExtensionContextInvalidatedError } from "./runtimeMessaging";
+import { getSelectionAndContext, SelectionTooltipManager } from "./selectionTooltip";
 
 declare global {
   interface Window {
@@ -12,6 +13,8 @@ declare global {
 function bootstrapContentRuntime() {
   let currentTabId = 0;
   let debugMode = false;
+  let lastSelectionText = "";
+
   const controller = createPageController(document, {
     async requestTranslations(blocks) {
       try {
@@ -59,7 +62,7 @@ function bootstrapContentRuntime() {
   const runtimeListener = (
     message: { type?: string; tabId?: number },
     _sender: chrome.runtime.MessageSender,
-    sendResponse: (response?: { ok: boolean }) => void
+    sendResponse: (response?: any) => void
   ) => {
     if (message?.type === "runtime/ping") {
       if (debugMode) {
@@ -95,16 +98,90 @@ function bootstrapContentRuntime() {
       debugMode = false;
       void controller.deactivate();
     }
+
+    if (message?.type === "selection/request-context") {
+      const { action } = message as { action: "translate" | "explain" };
+      const selectionInfo = getSelectionAndContext();
+      if (!selectionInfo) {
+        sendResponse(null);
+        return;
+      }
+
+      lastSelectionText = selectionInfo.selectionText;
+
+      // Render loading tooltip card
+      SelectionTooltipManager.getInstance().showLoading(
+        selectionInfo.rect,
+        action,
+        selectionInfo.selectionText
+      );
+
+      sendResponse({
+        selectionText: selectionInfo.selectionText,
+        contextText: selectionInfo.contextText
+      });
+      return;
+    }
+
+    if (message?.type === "selection/render-result") {
+      const { action, status, text, error } = message as {
+        action: "translate" | "explain";
+        status: "success" | "error";
+        text?: string;
+        error?: string;
+      };
+
+      const tooltip = SelectionTooltipManager.getInstance();
+
+      if (status === "success" && text) {
+        tooltip.renderResult(action, lastSelectionText, text);
+      } else {
+        tooltip.renderError(action, lastSelectionText, error || "Unknown rendering error.");
+      }
+      sendResponse({ ok: true });
+      return;
+    }
+  };
+
+  const storageListener = (
+    changes: { [key: string]: chrome.storage.StorageChange },
+    areaName: string
+  ) => {
+    if (areaName === "local" && changes.extensionConfig) {
+      const oldConfig = changes.extensionConfig.oldValue;
+      const newConfig = changes.extensionConfig.newValue;
+      const oldLang = oldConfig?.targetLanguage;
+      const newLang = newConfig?.targetLanguage;
+      if (oldLang && newLang && oldLang !== newLang) {
+        if (controller.isActive()) {
+          if (debugMode) {
+            console.log("[bilingual]", "targetLanguage changed, reactivating pageController", { oldLang, newLang });
+          }
+          void (async () => {
+            await controller.deactivate();
+            await controller.activate();
+          })();
+        }
+      }
+    }
   };
 
   if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener(runtimeListener);
   }
 
+  if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener(storageListener);
+  }
+
   return {
     dispose() {
       chrome.runtime?.onMessage?.removeListener?.(runtimeListener);
+      if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+        chrome.storage.onChanged.removeListener(storageListener);
+      }
       void controller.deactivate().catch(() => {});
+      SelectionTooltipManager.getInstance().destroy();
     }
   };
 }

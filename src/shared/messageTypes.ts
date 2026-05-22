@@ -41,9 +41,25 @@ export type PageStatusReportMessage = {
   pendingRequestCount: number;
 };
 
+export type SelectionRequestContextMessage = {
+  type: "selection/request-context";
+  action: "translate" | "explain";
+};
+
+export type SelectionRenderResultMessage = {
+  type: "selection/render-result";
+  action: "translate" | "explain";
+  status: "success" | "error";
+  text?: string;
+  error?: string;
+};
+
 export type RuntimeMessage =
   | ActivatePageTranslationMessage
   | DeactivatePageTranslationMessage
   | ApiTestMessage
   | TranslationRequestMessage
-  | PageStatusReportMessage;
+  | PageStatusReportMessage
+  | SelectionRequestContextMessage
+  | SelectionRenderResultMessage;
+

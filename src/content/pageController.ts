@@ -407,6 +407,10 @@ export function createPageController(doc: Document, dependencies: PageController
   }
 
   return {
+    isActive() {
+      return active;
+    },
+
     async activate() {
       const nextPageHref = doc.location?.href ?? "";
       if (active && activePageHref !== nextPageHref) {
