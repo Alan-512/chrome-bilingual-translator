@@ -131,8 +131,7 @@ export function collectGoogleSearchCandidateBlock(
     rehydrateKey: `google-search|${page.surface}|${blockKind}|${getKindIndex(resultRoot, blockKind)}|${normalizeText(sourceText)}`,
     renderHint: {
       anchorElement: titleAnchorElement,
-      expansionRoot: resultRoot,
-      skipLoadingPlaceholder: true
+      expansionRoot: resultRoot
     }
   };
 }
