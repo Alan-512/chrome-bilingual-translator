@@ -5,6 +5,8 @@ import { isExtensionContextInvalidatedError } from "../../../src/content/runtime
 describe("runtime messaging", () => {
   it("recognizes an invalidated extension context error", () => {
     expect(isExtensionContextInvalidatedError(new Error("Extension context invalidated."))).toBe(true);
+    expect(isExtensionContextInvalidatedError(new Error("Could not establish connection. Receiving end does not exist."))).toBe(true);
+    expect(isExtensionContextInvalidatedError(new Error("The message port closed before a response was received."))).toBe(true);
   });
 
   it("does not match unrelated errors", () => {

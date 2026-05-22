@@ -8,6 +8,7 @@ import {
   renderTranslationLoadingBelow
 } from "./translationRenderer";
 import { ensureStatusPill, updateStatusPill } from "./statusPill";
+import { isExtensionContextInvalidatedError } from "./runtimeMessaging";
 
 type ObserverCoordinatorLike = {
   start(candidates: HTMLElement[], callbacks: { onVisible: (elements: HTMLElement[]) => void; onMutation: () => void }): void;
@@ -61,7 +62,7 @@ async function safeReportPageState(
   try {
     await dependencies.reportPageState(state);
   } catch (error) {
-    if (error instanceof Error && /Extension context invalidated/i.test(error.message)) {
+    if (isExtensionContextInvalidatedError(error)) {
       return;
     }
 
