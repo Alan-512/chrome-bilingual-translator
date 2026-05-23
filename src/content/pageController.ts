@@ -407,6 +407,49 @@ export function createPageController(doc: Document, dependencies: PageController
     updateStatusPill(statusPill, { state: "idle", translatedBlockCount: 0 });
   }
 
+  async function handleSpaNavigation(nextHref: string) {
+    resetPageStateForNavigation();
+    activePageHref = nextHref;
+    active = true;
+
+    await safeReportPageState(dependencies, {
+      enabled: true,
+      translatedBlockCount: 0,
+      pendingRequestCount: 0
+    });
+
+    const initialCandidates = collectCandidateBlocks(doc);
+    observerCoordinator.start(
+      initialCandidates.map((candidate) => candidate.element),
+      {
+        onVisible: (elements) => {
+          void processCandidates(elements);
+        },
+        onMutation: () => {
+          const currentHref = doc.location?.href ?? "";
+          if (active && activePageHref !== currentHref) {
+            void handleSpaNavigation(currentHref);
+            return;
+          }
+          const nextCandidates = collectCandidateBlocks(doc)
+            .filter((candidate) => !isCandidateSatisfied(candidate))
+            .map((candidate) => candidate.element);
+          observerCoordinator.observeCandidates(nextCandidates);
+          const readyElements = nextCandidates.filter((element) => isElementReadyForTranslation(element));
+          if (readyElements.length > 0) {
+            void processCandidates(readyElements);
+          }
+        }
+      }
+    );
+
+    await processCandidates(
+      initialCandidates
+        .map((candidate) => candidate.element)
+        .filter((element) => isElementReadyForTranslation(element))
+    );
+  }
+
   return {
     isActive() {
       return active;
@@ -437,6 +480,11 @@ export function createPageController(doc: Document, dependencies: PageController
               void processCandidates(elements);
             },
             onMutation: () => {
+              const currentHref = doc.location?.href ?? "";
+              if (active && activePageHref !== currentHref) {
+                void handleSpaNavigation(currentHref);
+                return;
+              }
               const nextCandidates = collectCandidateBlocks(doc)
                 .filter((candidate) => !isCandidateSatisfied(candidate))
                 .map((candidate) => candidate.element);
