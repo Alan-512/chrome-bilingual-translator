@@ -388,4 +388,47 @@ describe("renderTranslationBelow", () => {
     expect(translation).not.toBeNull();
     expect(translation.textContent).toBe("列表项翻译");
   });
+
+  it("appends translations inside the anchor element when the parent has a table-row layout", () => {
+    document.body.innerHTML = `
+      <div style="display: table-row;">
+        <span id="source">Table cell text</span>
+      </div>
+    `;
+    const source = document.getElementById("source") as HTMLSpanElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "单元格翻译"
+    });
+
+    expect(source.nextElementSibling).toBeNull();
+    const translation = source.querySelector("[data-bilingual-translator-owned='true']") as HTMLElement;
+    expect(translation).not.toBeNull();
+    expect(translation.textContent).toBe("单元格翻译");
+  });
+
+  it("appends translations inside dt and dd definition list tags", () => {
+    document.body.innerHTML = `
+      <dl>
+        <dt id="term">Term</dt>
+        <dd id="desc">Description</dd>
+      </dl>
+    `;
+    const term = document.getElementById("term") as HTMLElement;
+    const desc = document.getElementById("desc") as HTMLElement;
+
+    renderTranslationBelow(term, {
+      blockId: "term-trans",
+      translationText: "术语"
+    });
+    renderTranslationBelow(desc, {
+      blockId: "desc-trans",
+      translationText: "描述说明"
+    });
+
+    expect(term.nextElementSibling).toBe(desc);
+    expect(term.querySelector("[data-bilingual-translator-owned='true']")?.textContent).toBe("术语");
+    expect(desc.querySelector("[data-bilingual-translator-owned='true']")?.textContent).toBe("描述说明");
+  });
 });
