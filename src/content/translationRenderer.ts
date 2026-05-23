@@ -314,6 +314,11 @@ function getOrCreateTranslationElement(
 }
 
 function relaxClippedAncestors(sourceElement: HTMLElement, expansionRoot?: HTMLElement): void {
+  const doc = sourceElement.ownerDocument;
+  if (classifyPage(doc).site === "google-search") {
+    return;
+  }
+
   if (expansionRoot) {
     expansionRoot.setAttribute(EXPANDED_ATTRIBUTE, "true");
     expansionRoot.style.overflow = "visible";

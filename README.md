@@ -6,14 +6,17 @@ It keeps the original text on the page and inserts translated text below the sou
 
 ## What It Does
 
-- Manually translates the current webpage from the right-click menu
-- Keeps the source text visible and inserts the selected target language below it
-- Supports lazy translation for visible content as you scroll
-- Supports dynamic pages that rerender while you browse
-- Supports multiple target languages from the options page
-- Supports:
-  - `OpenAI Compatible`
-  - `Google Gemini`
+- **Full Page Bilingual Translation**: Manually translates the current webpage from the right-click menu, keeping the original text visible and inserting the selected target language cleanly below it.
+- **Selection Translation & Explain (New)**: Select any word or block of text, right-click, and choose to instantly translate it or get a contextual explanation. Renders in a sleek, non-intrusive floating tooltip card that handles scroll bounds, input fields, and z-index contexts automatically.
+- **Dynamic Scroll & Re-render Support**: Dynamically translates new visible content as you scroll down (lazy translation) and recovers translation elements automatically if a dynamic page re-renders.
+- **Dynamic Target Language Switch & Isolated Cache (New)**: Caching is fully isolated per target language. Modifying your target language in settings instantly triggers a clean page reactivation and re-translates all visible content in real-time, with no page refresh required!
+- **Context-Aware Flex & Grid Layout Protection (New)**: Identifies flexbox, grid, and list containers, inserting translations inline within elements to prevent layout squeezing, text truncation, or vertical single-character text stack bugs.
+- **Smart Visibility Detection (New)**: Accurately checks responsive stylesheets (e.g. Tailwind CSS) to only translate elements currently visible on your viewport width, completely skipping hidden layout columns or duplicate menus.
+- **Enhanced Site-Specific Layout Heuristics (New)**: Out-of-the-box support for complex custom sites:
+  - **Google Search**: Jitter-free and completely stable rendering, neutralizing infinite mutation/reflow loops.
+  - **Reddit**: Deep Shadow DOM boundary protection, avoiding flashing or disappearing translations on feed cards.
+  - **GitHub / OpenRouter / ProductHunt / Mintlify / Next.js**: Support for mock tag wrappers (`data-as`) and isolated repository zones.
+- **Multiple AI Providers**: Supports both standard `OpenAI Compatible` endpoints and native `Google Gemini` APIs.
 
 ## Webpage Coverage
 
@@ -148,16 +151,22 @@ The extension will call Gemini's native `generateContent` endpoint in this mode.
 
 ## How To Use
 
-1. Open a webpage
-2. Right-click anywhere on the page
-3. Click `Translate current webpage`
+### 1. Full Page Translation
+1. Open a webpage.
+2. Right-click anywhere on the page.
+3. Click **`Translate current webpage`**.
 
 What happens next:
+- The extension translates visible content first.
+- As you scroll, newly visible content continues translating automatically (lazy translation).
+- The original text stays fully in place, with the selected target-language translation neatly inserted below it.
 
-- The extension translates visible content first
-- As you scroll, newly visible content continues translating
-- The original text stays in place
-- The selected target-language translation is inserted below it
+### 2. Selection Translate & Explain
+1. Highlight any word, phrase, or paragraph on a page.
+2. Right-click the highlighted text.
+3. Hover over **`Bilingual Translation Selection`** and choose:
+   - **`Translate Selection`**: Instantly shows the bilingual translation in a beautiful floating card.
+   - **`Explain Selection`**: Translates and provides deep linguistic/semantic explanation of the selected text.
 
 ## Settings
 
