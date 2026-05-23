@@ -56,8 +56,28 @@ function isExtensionOwned(element: Element): boolean {
 }
 
 function isHidden(element: HTMLElement): boolean {
-  if (element.hidden || element.style.display === "none" || element.getAttribute("aria-hidden") === "true") {
+  if (element.hidden || element.getAttribute("aria-hidden") === "true") {
     return true;
+  }
+
+  if (element.style.display === "none" || element.style.visibility === "hidden") {
+    return true;
+  }
+
+  const isJsdom = element.ownerDocument.defaultView?.navigator.userAgent.includes("jsdom") ?? false;
+
+  if (!isJsdom) {
+    if (element.offsetParent === null && element.tagName !== "BODY" && element.tagName !== "HTML") {
+      const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+      if (style && style.position !== "fixed") {
+        return true;
+      }
+    }
+
+    const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+    if (style && (style.display === "none" || style.visibility === "hidden")) {
+      return true;
+    }
   }
 
   return (
