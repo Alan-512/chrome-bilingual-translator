@@ -1,3 +1,5 @@
+import { classifyPage } from "./pageClassifier";
+
 type RenderTranslationInput = {
   blockId: string;
   translationText: string;
@@ -288,12 +290,16 @@ function getOrCreateTranslationElement(
   translationElement.style.unicodeBidi = "plaintext";
   applyHorizontalLayoutFromAnchor(translationElement, anchorElement);
 
+  const doc = sourceElement.ownerDocument;
+  const page = classifyPage(doc);
+  const isGeneric = page.site === "generic";
+
   const parent = anchorElement.parentElement;
   const parentStyle = parent ? parent.ownerDocument.defaultView?.getComputedStyle(parent) : null;
   const parentDisplay = parentStyle?.display ?? "";
   
-  const isParentFlexOrGrid = parentDisplay === "flex" || parentDisplay === "inline-flex" || parentDisplay === "grid" || parentDisplay === "inline-grid";
-  const isParentTable = parentDisplay === "table" || parentDisplay === "inline-table" || parentDisplay === "table-row" || parentDisplay === "table-row-group";
+  const isParentFlexOrGrid = isGeneric && (parentDisplay === "flex" || parentDisplay === "inline-flex" || parentDisplay === "grid" || parentDisplay === "inline-grid");
+  const isParentTable = isGeneric && (parentDisplay === "table" || parentDisplay === "inline-table" || parentDisplay === "table-row" || parentDisplay === "table-row-group");
   
   const tagName = anchorElement.tagName.toLowerCase();
   const isListOrDefinition = tagName === "li" || tagName === "dt" || tagName === "dd";
