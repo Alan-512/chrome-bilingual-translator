@@ -348,4 +348,44 @@ describe("renderTranslationBelow", () => {
     expect(translation.style.marginLeft).toBe("220px");
     expect(translation.style.marginRight).toBe("220px");
   });
+
+  it("appends translations inside the anchor element when the parent has a flex layout", () => {
+    document.body.innerHTML = `
+      <div style="display: flex;">
+        <p id="source">Flex child text</p>
+      </div>
+    `;
+    const source = document.getElementById("source") as HTMLParagraphElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "弹性布局子元素翻译"
+    });
+
+    // Translation should be a child of the paragraph, not a sibling
+    expect(source.nextElementSibling).toBeNull();
+    const translation = source.querySelector("[data-bilingual-translator-owned='true']") as HTMLElement;
+    expect(translation).not.toBeNull();
+    expect(translation.textContent).toBe("弹性布局子元素翻译");
+  });
+
+  it("appends translations inside the anchor element when the anchor is a list item", () => {
+    document.body.innerHTML = `
+      <ul>
+        <li id="source">List item text</li>
+      </ul>
+    `;
+    const source = document.getElementById("source") as HTMLLIElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "列表项翻译"
+    });
+
+    // Translation should be a child of the list item, not a sibling
+    expect(source.nextElementSibling).toBeNull();
+    const translation = source.querySelector("[data-bilingual-translator-owned='true']") as HTMLElement;
+    expect(translation).not.toBeNull();
+    expect(translation.textContent).toBe("列表项翻译");
+  });
 });

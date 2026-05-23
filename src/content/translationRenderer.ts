@@ -74,6 +74,7 @@ function ensureTranslationStyles(doc: Document): void {
       writing-mode: horizontal-tb;
       text-orientation: mixed;
       text-align: start;
+      flex-shrink: 0;
     }
 
     .bilingual-translator-translation[data-bilingual-translator-state="translated"] {
@@ -107,6 +108,18 @@ function ensureTranslationStyles(doc: Document): void {
       border-radius: 999px;
       animation: bilingual-translator-spin 0.85s linear infinite;
       flex: none;
+    }
+
+    h1 .bilingual-translator-translation,
+    h2 .bilingual-translator-translation,
+    h3 .bilingual-translator-translation,
+    h4 .bilingual-translator-translation,
+    h5 .bilingual-translator-translation,
+    h6 .bilingual-translator-translation {
+      font-size: 0.75em;
+      font-weight: normal;
+      text-transform: none;
+      letter-spacing: normal;
     }
 
     @keyframes bilingual-translator-spin {
@@ -244,9 +257,22 @@ function getOrCreateTranslationElement(
 ): HTMLElement {
   ensureTranslationStyles(sourceElement.ownerDocument);
   const anchorElement = getTranslationAnchorElement(sourceElement, explicitAnchorElement);
-  const existing = anchorElement.parentElement?.querySelector<HTMLElement>(
-    `[${OWNED_ATTRIBUTE}='true'][${BLOCK_ID_ATTRIBUTE}='${blockId}']`
+  
+  let existing = Array.from(anchorElement.children).find(
+    (child): child is HTMLElement =>
+      child instanceof HTMLElement &&
+      child.getAttribute(OWNED_ATTRIBUTE) === "true" &&
+      child.getAttribute(BLOCK_ID_ATTRIBUTE) === blockId
   );
+  if (!existing && anchorElement.parentElement) {
+    existing = Array.from(anchorElement.parentElement.children).find(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement &&
+        child.getAttribute(OWNED_ATTRIBUTE) === "true" &&
+        child.getAttribute(BLOCK_ID_ATTRIBUTE) === blockId
+    );
+  }
+
   if (existing) {
     applyHorizontalLayoutFromAnchor(existing, anchorElement);
     return existing;
@@ -261,7 +287,19 @@ function getOrCreateTranslationElement(
   translationElement.style.direction = "ltr";
   translationElement.style.unicodeBidi = "plaintext";
   applyHorizontalLayoutFromAnchor(translationElement, anchorElement);
-  anchorElement.insertAdjacentElement("afterend", translationElement);
+
+  const parent = anchorElement.parentElement;
+  const parentStyle = parent ? parent.ownerDocument.defaultView?.getComputedStyle(parent) : null;
+  const parentDisplay = parentStyle?.display ?? "";
+  const isParentFlexOrGrid = parentDisplay === "flex" || parentDisplay === "inline-flex" || parentDisplay === "grid" || parentDisplay === "inline-grid";
+  const isLi = anchorElement.tagName.toLowerCase() === "li";
+
+  if (isParentFlexOrGrid || isLi) {
+    anchorElement.appendChild(translationElement);
+  } else {
+    anchorElement.insertAdjacentElement("afterend", translationElement);
+  }
+
   return translationElement;
 }
 
