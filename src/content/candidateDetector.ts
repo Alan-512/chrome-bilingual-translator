@@ -33,6 +33,8 @@ const CONTENT_SELECTOR = [
   "[slot='comment']",
   "[data-post-click-location='title']",
   "[data-post-click-location='text-body']",
+  "[data-as='p']",
+  "[data-as='li']",
   ".VwiC3b",
   ".yXK7lf",
   ".MUxGbd",
@@ -43,9 +45,9 @@ const CONTENT_SELECTOR = [
   ".kp-wholepage .kno-rdesc span",
   "[data-testid='model-list-item'] a[href]"
 ].join(", ");
-const DISALLOWED_ANCESTORS = ["nav", "header", "footer", "aside", "button"];
+const DISALLOWED_ANCESTORS = ["nav", "footer", "aside", "button"];
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
-const REDUNDANT_CONTAINER_SELECTOR = "p, li, blockquote, figcaption, h1, h2, h3, h4, h5, h6";
+const REDUNDANT_CONTAINER_SELECTOR = "p, li, blockquote, figcaption, h1, h2, h3, h4, h5, h6, [data-as='p'], [data-as='li']";
 const STRUCTURED_ROOT_SELECTOR = "blockquote, table, dl, [role='table'], [role='grid']";
 let nextSourceId = 0;
 
