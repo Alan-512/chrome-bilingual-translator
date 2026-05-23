@@ -42,6 +42,16 @@ function normalizeSourceText(text: string) {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function isSamePagePath(url1: string, url2: string): boolean {
+  try {
+    const u1 = new URL(url1);
+    const u2 = new URL(url2);
+    return u1.origin === u2.origin && u1.pathname === u2.pathname;
+  } catch {
+    return url1 === url2;
+  }
+}
+
 function getCandidateSignature(candidate: { element: HTMLElement; sourceText: string }) {
   const slotName = candidate.element.getAttribute("slot") ?? "";
   return `${candidate.element.tagName}|${slotName}|${normalizeSourceText(candidate.sourceText)}`;
@@ -427,7 +437,7 @@ export function createPageController(doc: Document, dependencies: PageController
         },
         onMutation: () => {
           const currentHref = doc.location?.href ?? "";
-          if (active && activePageHref !== currentHref) {
+          if (active && !isSamePagePath(activePageHref, currentHref)) {
             void handleSpaNavigation(currentHref);
             return;
           }
@@ -457,7 +467,7 @@ export function createPageController(doc: Document, dependencies: PageController
 
     async activate() {
       const nextPageHref = doc.location?.href ?? "";
-      if (active && activePageHref !== nextPageHref) {
+      if (active && !isSamePagePath(activePageHref, nextPageHref)) {
         resetPageStateForNavigation();
         activePageHref = nextPageHref;
         active = false;
@@ -481,7 +491,7 @@ export function createPageController(doc: Document, dependencies: PageController
             },
             onMutation: () => {
               const currentHref = doc.location?.href ?? "";
-              if (active && activePageHref !== currentHref) {
+              if (active && !isSamePagePath(activePageHref, currentHref)) {
                 void handleSpaNavigation(currentHref);
                 return;
               }
