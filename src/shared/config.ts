@@ -15,9 +15,14 @@ export const SUPPORTED_TARGET_LANGUAGES = [
 
 export const DEFAULT_OPENAI_PROVIDER = "openai-compatible" as const;
 export const GEMINI_PROVIDER = "google-gemini" as const;
+export const OPENROUTER_PROVIDER = "openrouter" as const;
 export const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta" as const;
+export const OPENROUTER_API_BASE_URL = "https://openrouter.ai/api/v1/chat/completions" as const;
 
-export type ProviderType = typeof DEFAULT_OPENAI_PROVIDER | typeof GEMINI_PROVIDER;
+export type ProviderType =
+  | typeof DEFAULT_OPENAI_PROVIDER
+  | typeof GEMINI_PROVIDER
+  | typeof OPENROUTER_PROVIDER;
 export type TargetLanguageCode = (typeof SUPPORTED_TARGET_LANGUAGES)[number]["code"];
 
 export type PersistedExtensionConfigInput = {
@@ -73,6 +78,10 @@ export function resolveApiBaseUrlForProvider(provider: ProviderType, apiBaseUrl:
 
   if (provider === GEMINI_PROVIDER && !trimmed) {
     return GEMINI_API_BASE_URL;
+  }
+
+  if (provider === OPENROUTER_PROVIDER && !trimmed) {
+    return OPENROUTER_API_BASE_URL;
   }
 
   return trimmed;

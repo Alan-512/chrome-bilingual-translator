@@ -128,6 +128,22 @@ describe("API base URL normalization", () => {
     expect(persisted.apiBaseUrl).toBe("https://custom-gemini-host.example.com/v1beta");
     expect(persisted.apiOrigin).toBe("https://custom-gemini-host.example.com");
   });
+
+  it("uses the built-in OpenRouter base URL when provider is openrouter and URL is empty", () => {
+    const persisted = buildPersistedConfigRecord({
+      provider: "openrouter",
+      apiBaseUrl: "",
+      apiKey: "openrouter-key",
+      model: "google/gemini-2.5-flash",
+      translateTitles: true,
+      translateShortContentBlocks: true,
+      debugMode: false,
+      targetLanguage: "en"
+    });
+
+    expect(persisted.apiBaseUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
+    expect(persisted.apiOrigin).toBe("https://openrouter.ai");
+  });
 });
 
 describe("API base URL security validation", () => {

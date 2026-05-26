@@ -2,6 +2,8 @@ import {
   DEFAULT_OPENAI_PROVIDER,
   GEMINI_API_BASE_URL,
   GEMINI_PROVIDER,
+  OPENROUTER_API_BASE_URL,
+  OPENROUTER_PROVIDER,
   SUPPORTED_TARGET_LANGUAGES,
   buildPersistedConfigRecord,
   getApiBaseUrlSecurityError,
@@ -106,7 +108,12 @@ function showToast(doc: Document, message: string, variant: "success" | "error")
 }
 
 function collectFormInput(controls: OptionsFormControls): PersistedExtensionConfigInput {
-  const provider = controls.provider.value === GEMINI_PROVIDER ? GEMINI_PROVIDER : DEFAULT_OPENAI_PROVIDER;
+  const provider =
+    controls.provider.value === GEMINI_PROVIDER
+      ? GEMINI_PROVIDER
+      : controls.provider.value === OPENROUTER_PROVIDER
+        ? OPENROUTER_PROVIDER
+        : DEFAULT_OPENAI_PROVIDER;
 
   return {
     provider,
@@ -124,13 +131,14 @@ function collectFormInput(controls: OptionsFormControls): PersistedExtensionConf
 
 function applyProviderPreset(controls: OptionsFormControls) {
   if (controls.provider.value === GEMINI_PROVIDER) {
-    if (!controls.apiBaseUrl.value.trim()) {
-      controls.apiBaseUrl.value = GEMINI_API_BASE_URL;
-    }
-
-    if (!controls.model.value.trim()) {
-      controls.model.value = "gemini-3.1-flash-lite-preview";
-    }
+    controls.apiBaseUrl.value = GEMINI_API_BASE_URL;
+    controls.model.value = "gemini-3.1-flash-lite-preview";
+  } else if (controls.provider.value === OPENROUTER_PROVIDER) {
+    controls.apiBaseUrl.value = OPENROUTER_API_BASE_URL;
+    controls.model.value = "google/gemini-2.5-flash";
+  } else if (controls.provider.value === DEFAULT_OPENAI_PROVIDER) {
+    controls.apiBaseUrl.value = "https://api.openai.com/v1";
+    controls.model.value = "gpt-4o-mini";
   }
 }
 
