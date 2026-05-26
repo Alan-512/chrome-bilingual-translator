@@ -7,16 +7,16 @@ It keeps the original text on the page and inserts translated text below the sou
 ## What It Does
 
 - **Full Page Bilingual Translation**: Manually translates the current webpage from the right-click menu, keeping the original text visible and inserting the selected target language cleanly below it.
-- **Selection Translation & Explain (New)**: Select any word or block of text, right-click, and choose to instantly translate it or get a contextual explanation. Renders in a sleek, non-intrusive floating tooltip card that handles scroll bounds, input fields, and z-index contexts automatically.
-- **Dynamic Scroll & Re-render Support**: Dynamically translates new visible content as you scroll down (lazy translation) and recovers translation elements automatically if a dynamic page re-renders.
-- **Dynamic Target Language Switch & Isolated Cache (New)**: Caching is fully isolated per target language. Modifying your target language in settings instantly triggers a clean page reactivation and re-translates all visible content in real-time, with no page refresh required!
-- **Context-Aware Flex & Grid Layout Protection (New)**: Identifies flexbox, grid, and list containers, inserting translations inline within elements to prevent layout squeezing, text truncation, or vertical single-character text stack bugs.
-- **Smart Visibility Detection (New)**: Accurately checks responsive stylesheets (e.g. Tailwind CSS) to only translate elements currently visible on your viewport width, completely skipping hidden layout columns or duplicate menus.
-- **Enhanced Site-Specific Layout Heuristics (New)**: Out-of-the-box support for complex custom sites:
-  - **Google Search**: Jitter-free and completely stable rendering, neutralizing infinite mutation/reflow loops.
-  - **Reddit**: Deep Shadow DOM boundary protection, avoiding flashing or disappearing translations on feed cards.
-  - **GitHub / OpenRouter / ProductHunt / Mintlify / Next.js**: Support for mock tag wrappers (`data-as`) and isolated repository zones.
-- **Multiple AI Providers**: Supports both standard `OpenAI Compatible` endpoints and native `Google Gemini` APIs.
+- **Selection Translation & Explain (with Shadow DOM Piercing)**: Select any word or block of text, right-click, and choose to instantly translate it or get a contextual explanation. It recursively pierces Shadow DOM boundaries to support selections inside custom Web Components and nested comment feeds, rendering inside a beautiful, non-intrusive floating card that auto-handles z-indexes and screen boundaries.
+- **Parallel Batch Translation & High-Throughput**: Employs an aggressive batching algorithm that packages up to 48 text blocks in a single translation request, running multiple streams in parallel to provide blistering translation speeds on content-heavy pages without triggering rate limits.
+- **Dynamic Scroll & Re-render Support**: Dynamically translates newly visible content as you scroll down (lazy translation) and recovers translation elements automatically if a dynamic page re-renders.
+- **Dynamic Target Language Switch & Isolated Cache**: Caching is fully isolated per target language. Modifying your target language in settings instantly triggers a clean page reactivation and re-translates all visible content in real-time with no page refresh required, preventing translation cache cross-contamination.
+- **Context-Aware Flex & Grid Layout Protection**: Identifies flexbox, grid, and list containers, inserting translations inline within elements to prevent layout squeezing, text truncation, or vertical single-character text stack bugs.
+- **Smart Visibility Detection**: Accurately checks responsive stylesheets to only translate elements currently visible on your viewport width, completely skipping hidden layout columns or duplicate menus.
+- **Robust Rendering & Dynamic Page Stability**: Engineered to support highly interactive and layout-heavy modern websites:
+  - **Jitter-Free Mutation Protection**: Neutralizes infinite DOM mutation/reflow loops on dynamic layouts and single-page applications (SPAs).
+  - **Virtual & Mock Tag Preservation**: Native support for custom layout components, mock tag wrappers (e.g., `data-as`), and isolated container zones.
+- **Wide AI Provider Support & Adaptive Parameter Tuning**: Seamlessly supports both standard `OpenAI Compatible` endpoints and native `Google Gemini` APIs. Features intelligent endpoint routing (preventing 404 errors) and dynamically adapts advanced API settings (like automatically adjusting reasoning budgets or `thinkingConfig` parameters) based on the model provider.
 
 ## Webpage Coverage
 
@@ -127,7 +127,7 @@ Use this for OpenAI-style APIs that accept:
 Example fields:
 
 - `Provider`: `OpenAI Compatible`
-- `API Base URL`: your full compatible endpoint
+- `API Base URL`: your API base endpoint (e.g. `https://api.openai.com/v1` or `https://integrate.api.nvidia.com/v1`). The extension automatically handles path suffixes and routes requests correctly to `/chat/completions`, preventing 404 path errors.
 - `API Key`: your API key
 - `Model`: your model name
 
