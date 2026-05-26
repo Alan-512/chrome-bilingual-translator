@@ -24,9 +24,7 @@ export class PersistentTranslationCache {
     const hash = hashNormalizedText(normalizedSourceText);
     if (targetLanguage) {
       const key = `${targetLanguage}:${hash}`;
-      if (cache[key] !== undefined) {
-        return cache[key];
-      }
+      return cache[key] ?? null;
     }
     return cache[hash] ?? null;
   }

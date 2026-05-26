@@ -723,10 +723,10 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
-  it("renders completed batches before later batches finish with twenty-four blocks per batch", async () => {
+  it("renders completed batches before later batches finish with forty-eight blocks per batch", async () => {
     document.body.innerHTML = `
       <main>
-        ${Array.from({ length: 25 }, (_, index) => `<p>Paragraph ${index + 1} with enough content to translate well.</p>`).join("")}
+        ${Array.from({ length: 49 }, (_, index) => `<p>Paragraph ${index + 1} with enough content to translate well.</p>`).join("")}
       </main>
     `;
 
@@ -758,7 +758,7 @@ describe("pageController", () => {
     await settlePromises();
 
     let renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
-    expect(renderedBlocks).toHaveLength(25);
+    expect(renderedBlocks).toHaveLength(49);
     expect(renderedBlocks.every((node) => node.getAttribute("data-bilingual-translator-state") === "loading")).toBe(
       true
     );
@@ -771,7 +771,7 @@ describe("pageController", () => {
     await settlePromises();
 
     renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
-    expect(renderedBlocks.filter((node) => node.getAttribute("data-bilingual-translator-state") === "translated")).toHaveLength(24);
+    expect(renderedBlocks.filter((node) => node.getAttribute("data-bilingual-translator-state") === "translated")).toHaveLength(48);
     expect(renderedBlocks.filter((node) => node.getAttribute("data-bilingual-translator-state") === "loading")).toHaveLength(1);
 
     const secondBatchBlocks = requestTranslations.mock.calls[1]?.[0] as Array<{ blockId: string; sourceText: string }>;
@@ -782,7 +782,7 @@ describe("pageController", () => {
     await activationPromise;
 
     renderedBlocks = Array.from(document.querySelectorAll("[data-bilingual-translator-owned='true']"));
-    expect(renderedBlocks).toHaveLength(25);
+    expect(renderedBlocks).toHaveLength(49);
     expect(renderedBlocks.every((node) => node.textContent?.includes("ZH:"))).toBe(true);
     await controller.deactivate();
   });
@@ -790,7 +790,7 @@ describe("pageController", () => {
   it("limits each processing cycle to three batches on very long pages", async () => {
     document.body.innerHTML = `
       <main>
-        ${Array.from({ length: 90 }, (_, index) => `<p>Long page paragraph ${index + 1} with enough content to translate.</p>`).join("")}
+        ${Array.from({ length: 180 }, (_, index) => `<p>Long page paragraph ${index + 1} with enough content to translate.</p>`).join("")}
       </main>
     `;
 
@@ -808,16 +808,16 @@ describe("pageController", () => {
 
     const requestedBlockCount = requestTranslations.mock.calls.reduce((count, call) => count + call[0].length, 0);
     expect(requestTranslations).toHaveBeenCalledTimes(3);
-    expect(requestedBlockCount).toBe(72);
-    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(72);
+    expect(requestedBlockCount).toBe(144);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(144);
 
     await controller.activate();
 
     const totalRequestedBlockCount = requestTranslations.mock.calls.reduce((count, call) => count + call[0].length, 0);
-    expect(totalRequestedBlockCount).toBe(90);
-    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(90);
+    expect(totalRequestedBlockCount).toBe(180);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(180);
     await controller.deactivate();
-  });
+  }, 15000);
 
   it("falls back to per-block retries when a batch request fails", async () => {
     const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) => {

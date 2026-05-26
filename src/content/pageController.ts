@@ -28,8 +28,8 @@ type PageControllerDependencies = {
   debugLog?: (event: string, detail?: Record<string, unknown>) => void;
 };
 
-const TRANSLATION_BATCH_SIZE = 24;
-const MAX_CONCURRENT_BATCHES = 2;
+const TRANSLATION_BATCH_SIZE = 48;
+const MAX_CONCURRENT_BATCHES = 3;
 const MAX_CANDIDATES_PER_PROCESS_CYCLE = TRANSLATION_BATCH_SIZE * 3;
 
 type CandidateBlock = ReturnType<typeof collectCandidateBlocks>[number];

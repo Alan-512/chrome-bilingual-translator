@@ -101,7 +101,53 @@ describe("translator client", () => {
         provider: "openai-compatible",
         apiBaseUrl: "https://api.openai.com/v1/chat/completions",
         apiKey: "secret-key",
-        model: "gpt-5-mini",
+        model: "o3-mini",
+        translateTitles: true,
+        translateShortContentBlocks: true
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(result).toEqual({ alpha: "第一段" });
+  });
+
+  it("disables thinking for Nvidia reasoning models under OpenAI Compatible provider", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body.extra_body).toEqual({
+        chat_template_kwargs: {
+          enable_thinking: false
+        },
+        reasoning_budget: 0
+      });
+
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  alpha: "第一段"
+                })
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
+        apiBaseUrl: "https://integrate.api.nvidia.com/v1/chat/completions",
+        apiKey: "secret-key",
+        model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
         translateTitles: true,
         translateShortContentBlocks: true
       }),
@@ -159,7 +205,7 @@ describe("translator client", () => {
         sourceText: "Cached text",
         translation: "缓存文本"
       }
-    ]);
+    ], "zh-CN");
 
     const fetchMock = vi.fn();
     const client = createTranslatorClient({
@@ -270,6 +316,56 @@ describe("translator client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1); // Still 1
   });
 
+  it("does not fall back to generic cache when target language is specified", async () => {
+    const cache = new PersistentTranslationCache(createMemoryStorageArea());
+    // Seed generic translation (without target language)
+    await cache.setMany([
+      {
+        sourceText: "Hello world",
+        translation: "generic translation"
+      }
+    ]);
+
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  alpha: "Bonjour le monde"
+                })
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache
+    });
+
+    // Request translation for French (should NOT return generic translation, should hit network)
+    const result = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "openai-compatible",
+        apiBaseUrl: "https://api.example.com/v1/chat/completions",
+        apiKey: "secret-key",
+        model: "o3-mini",
+        translateTitles: true,
+        translateShortContentBlocks: true,
+        targetLanguage: "fr"
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(result).toEqual({ alpha: "Bonjour le monde" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("fails fast on non-ok http responses", async () => {
     const fetchMock = vi.fn(async () => new Response("upstream failure", { status: 429, statusText: "Too Many Requests" }));
 
@@ -328,7 +424,7 @@ describe("translator client", () => {
     const result = await client.translateBlocks({
       config: buildPersistedConfigRecord({
         provider: "openai-compatible",
-        apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+        apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3/responses",
         apiKey: "secret-key",
         model: "ep-20260321184346-rlw84",
         translateTitles: true,
@@ -429,7 +525,7 @@ describe("translator client", () => {
       client.testConnection({
         config: buildPersistedConfigRecord({
           provider: "openai-compatible",
-          apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+          apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3/responses",
           apiKey: "secret-key",
           model: "ep-20260321184346-rlw84",
           translateTitles: true,
@@ -493,10 +589,10 @@ describe("translator client", () => {
     expect(result).toEqual({ alpha: "第一段" });
   });
 
-  it("uses zero thinking budget for Gemini 2.5 native requests", async () => {
+  it("does not use thinking budget for Gemini 2.5 standard requests", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
-      expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+      expect(body.generationConfig).toBeUndefined();
 
       return new Response(
         JSON.stringify({
@@ -538,10 +634,10 @@ describe("translator client", () => {
     expect(result).toEqual({ alpha: "第一段" });
   });
 
-  it("uses zero thinking budget for Gemma 4 native requests", async () => {
+  it("does not use thinking budget for Gemma 4 standard requests", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
-      expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+      expect(body.generationConfig).toBeUndefined();
 
       return new Response(
         JSON.stringify({

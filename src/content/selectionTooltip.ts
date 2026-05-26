@@ -4,6 +4,117 @@ export interface SelectionContext {
   rect: DOMRect;
 }
 
+function findSelectionRecursively(node: Node): { sel: Selection; range: Range; rect: DOMRect } | null {
+  if (node instanceof Element) {
+    if (node.shadowRoot) {
+      const shadowSel = (node.shadowRoot as any).getSelection?.();
+      if (shadowSel && shadowSel.rangeCount > 0 && shadowSel.toString().trim()) {
+        const range = shadowSel.getRangeAt(0);
+        let rect = range.getBoundingClientRect();
+        if (!rect || (rect.width === 0 && rect.height === 0)) {
+          let parentEl: Element | null = null;
+          if (range.startContainer instanceof Element) {
+            parentEl = range.startContainer;
+          } else if (range.startContainer.parentNode instanceof Element) {
+            parentEl = range.startContainer.parentNode;
+          }
+          if (parentEl) {
+            rect = parentEl.getBoundingClientRect();
+          }
+        }
+        if (rect) {
+          return { sel: shadowSel, range, rect };
+        }
+      }
+      const res = findSelectionRecursively(node.shadowRoot);
+      if (res) return res;
+    }
+    
+    // Check standard children
+    for (let i = 0; i < node.childNodes.length; i++) {
+      const res = findSelectionRecursively(node.childNodes[i]);
+      if (res) return res;
+    }
+  } else if (node instanceof ShadowRoot) {
+    for (let i = 0; i < node.childNodes.length; i++) {
+      const res = findSelectionRecursively(node.childNodes[i]);
+      if (res) return res;
+    }
+  }
+  return null;
+}
+
+function findDeepSelection(): { sel: Selection; range: Range; rect: DOMRect } | null {
+  // 1. Try to find selection via standard window.getSelection and trace into shadow DOMs
+  let sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && sel.toString().trim()) {
+    let currentSel = sel;
+    // Walk down into nested shadow DOMs
+    while (true) {
+      let nestedHost: Element | null = null;
+      const nodes = [currentSel.anchorNode, currentSel.focusNode];
+      for (const node of nodes) {
+        if (!node) continue;
+        if (node instanceof Element && node.shadowRoot) {
+          nestedHost = node;
+          break;
+        }
+        if (node.parentNode && node.parentNode instanceof Element && node.parentNode.shadowRoot) {
+          nestedHost = node.parentNode;
+          break;
+        }
+      }
+
+      if (!nestedHost && currentSel.rangeCount > 0) {
+        const range = currentSel.getRangeAt(0);
+        if (range.startContainer instanceof Element && range.startContainer.shadowRoot) {
+          nestedHost = range.startContainer;
+        } else if (range.endContainer instanceof Element && range.endContainer.shadowRoot) {
+          nestedHost = range.endContainer;
+        }
+      }
+
+      if (nestedHost && nestedHost.shadowRoot) {
+        const shadowSel = (nestedHost.shadowRoot as any).getSelection?.();
+        if (shadowSel && shadowSel.rangeCount > 0 && shadowSel.toString().trim()) {
+          currentSel = shadowSel;
+          continue;
+        }
+      }
+      break;
+    }
+
+    if (currentSel && currentSel.rangeCount > 0 && currentSel.toString().trim()) {
+      const range = currentSel.getRangeAt(0);
+      let rect = range.getBoundingClientRect();
+      if (!rect || (rect.width === 0 && rect.height === 0)) {
+        let parentEl: Element | null = null;
+        if (range.startContainer instanceof Element) {
+          parentEl = range.startContainer;
+        } else if (range.startContainer.parentNode instanceof Element) {
+          parentEl = range.startContainer.parentNode;
+        }
+        if (parentEl) {
+          rect = parentEl.getBoundingClientRect();
+        }
+      }
+      if (rect) {
+        return { sel: currentSel, range, rect };
+      }
+    }
+  }
+
+  // 2. Fallback to recursive DOM traversal starting from document.body
+  if (document.body) {
+    const result = findSelectionRecursively(document.body);
+    if (result) {
+      return result;
+    }
+  }
+
+  return null;
+}
+
 export function getSelectionAndContext(): SelectionContext | null {
   // 1. Traverse active elements recursively to find nested inputs or shadow roots
   let activeEl: Element | null = document.activeElement;
@@ -25,30 +136,17 @@ export function getSelectionAndContext(): SelectionContext | null {
     if (start !== null && end !== null && start !== end) {
       selectionText = activeEl.value.substring(start, end);
       contextText = activeEl.value; // surround context is the full text inside form field
-      
-      // Since inputs/textareas don't support getRangeAt, fallback to the element's bounding rect
       rect = activeEl.getBoundingClientRect();
     }
   }
 
-  // 3. Fallback to standard selection
+  // 3. Fallback to recursive shadow-piercing selection
   if (!selectionText) {
-    let shadowSelection = null;
-    let tempEl: Element | null = document.activeElement;
-    while (tempEl && tempEl.shadowRoot) {
-      if (typeof (tempEl.shadowRoot as any).getSelection === "function") {
-        shadowSelection = (tempEl.shadowRoot as any).getSelection();
-        break;
-      }
-      tempEl = tempEl.shadowRoot.activeElement;
-    }
-
-    const sel = shadowSelection || window.getSelection();
-
-    if (sel && sel.rangeCount > 0 && sel.toString().trim()) {
+    const deepSelInfo = findDeepSelection();
+    if (deepSelInfo) {
+      const { sel, range, rect: gotRect } = deepSelInfo;
       selectionText = sel.toString();
-      const range = sel.getRangeAt(0);
-      rect = range.getBoundingClientRect();
+      rect = gotRect;
 
       // Find nearest block ancestor for context
       let node: Node | null = range.startContainer;

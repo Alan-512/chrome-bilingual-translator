@@ -90,7 +90,7 @@ function parseTranslationPayload(content: string, expectedBlockIds: string[]): R
   return Object.fromEntries(expectedBlockIds.map((blockId) => [blockId, String(parsed[blockId])]));
 }
 
-function resolveApiMode(apiBaseUrl: string) {
+function resolveApiMode(apiBaseUrl: string, provider?: string) {
   const normalized = apiBaseUrl.replace(/\/+$/, "");
   if (normalized.endsWith("/chat/completions")) {
     return { mode: "chat" as const, url: normalized };
@@ -98,6 +98,10 @@ function resolveApiMode(apiBaseUrl: string) {
 
   if (normalized.endsWith("/responses")) {
     return { mode: "responses" as const, url: normalized };
+  }
+
+  if (provider === "openai-compatible" || provider === "openrouter") {
+    return { mode: "chat" as const, url: `${normalized}/chat/completions` };
   }
 
   return { mode: "responses" as const, url: `${normalized}/responses` };
@@ -124,20 +128,44 @@ function isOpenAiOfficialUrl(url: string) {
   }
 }
 
+function buildOpenAiReasoningConfig(url: string, model: string) {
+  const isReasoning = /thinking|reasoning/i.test(model) || /^o[1-9]/i.test(model);
+  const isNvidia = /nvidia/i.test(url);
+
+  if (isReasoning && isNvidia) {
+    return {
+      extra_body: {
+        chat_template_kwargs: {
+          enable_thinking: false
+        },
+        reasoning_budget: 0
+      }
+    };
+  }
+
+  if (isReasoning && isOpenAiOfficialUrl(url)) {
+    return {
+      reasoning: {
+        effort: "low"
+      }
+    };
+  }
+
+  return {};
+}
+
 function buildGeminiThinkingConfig(model: string) {
-  const isReasoningModel =
-    /thinking|reasoning/i.test(model) ||
-    /^(gemini-2\.5|gemini-[3-9]|gemma-[4-9])/i.test(model);
+  if (/^gemini-3/i.test(model)) {
+    return {
+      thinkingConfig: {
+        thinkingLevel: "minimal"
+      }
+    };
+  }
 
-  if (isReasoningModel) {
-    if (/^gemini-3/i.test(model)) {
-      return {
-        thinkingConfig: {
-          thinkingLevel: "minimal"
-        }
-      };
-    }
-
+  // Only apply thinkingBudget: 0 to explicit thinking/reasoning models (e.g., gemini-2.0-flash-thinking)
+  // Standard models (like gemma-4 or gemini-2.5-pro) do not support thinkingBudget: 0 or thinkingConfig at all
+  if (/thinking|reasoning/i.test(model)) {
     return {
       thinkingConfig: {
         thinkingBudget: 0
@@ -222,7 +250,7 @@ function buildApiTestRequest(config: ExtensionConfig) {
     };
   }
 
-  const resolvedApi = resolveApiMode(config.apiBaseUrl);
+  const resolvedApi = resolveApiMode(config.apiBaseUrl, config.provider);
 
   return {
     ...resolvedApi,
@@ -501,7 +529,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                 body: buildGeminiTranslationBody(config.model, uncachedBlocks, config.targetLanguage)
               }
             : (() => {
-                const resolvedApi = resolveApiMode(config.apiBaseUrl);
+                const resolvedApi = resolveApiMode(config.apiBaseUrl, config.provider);
                 const isGeminiChatMode = resolvedApi.mode === "chat" && isGeminiOpenAiCompatibilityUrl(resolvedApi.url);
 
                 return {
@@ -515,13 +543,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                     resolvedApi.mode === "chat"
                       ? {
                           model: config.model,
-                          ...(isOpenAiOfficialUrl(resolvedApi.url)
-                            ? {
-                                reasoning: {
-                                  effort: "low"
-                                }
-                              }
-                            : {}),
+                          ...buildOpenAiReasoningConfig(resolvedApi.url, config.model),
                           ...(isGeminiChatMode
                             ? {}
                             : {
@@ -533,13 +555,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                         }
                       : {
                           model: config.model,
-                          ...(isOpenAiOfficialUrl(resolvedApi.url)
-                            ? {
-                                reasoning: {
-                                  effort: "low"
-                                }
-                              }
-                            : {}),
+                          ...buildOpenAiReasoningConfig(resolvedApi.url, config.model),
                           input: buildResponsesApiInput(uncachedBlocks, config.targetLanguage)
                         }
                 };
@@ -596,7 +612,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           const failedUrl =
             config.provider === "google-gemini"
               ? `${config.apiBaseUrl.replace(/\/+$/, "")}/models/${config.model}:generateContent`
-              : resolveApiMode(config.apiBaseUrl).url;
+              : resolveApiMode(config.apiBaseUrl, config.provider).url;
           throw new Error(toNetworkErrorMessage(failedUrl));
         }
 
@@ -660,7 +676,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                 )
               }
             : (() => {
-                const resolvedApi = resolveApiMode(config.apiBaseUrl);
+                const resolvedApi = resolveApiMode(config.apiBaseUrl, config.provider);
 
                 return {
                   mode: resolvedApi.mode,
@@ -673,13 +689,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                     resolvedApi.mode === "chat"
                       ? {
                           model: config.model,
-                          ...(isOpenAiOfficialUrl(resolvedApi.url)
-                            ? {
-                                reasoning: {
-                                  effort: "low"
-                                }
-                              }
-                            : {}),
+                          ...buildOpenAiReasoningConfig(resolvedApi.url, config.model),
                           messages: buildSelectionChatMessages(
                             action,
                             selectionText,
@@ -689,13 +699,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                         }
                       : {
                           model: config.model,
-                          ...(isOpenAiOfficialUrl(resolvedApi.url)
-                            ? {
-                                reasoning: {
-                                  effort: "low"
-                                }
-                              }
-                            : {}),
+                          ...buildOpenAiReasoningConfig(resolvedApi.url, config.model),
                           input: buildSelectionResponsesApiInput(
                             action,
                             selectionText,
@@ -741,7 +745,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           const failedUrl =
             config.provider === "google-gemini"
               ? `${config.apiBaseUrl.replace(/\/+$/, "")}/models/${config.model}:generateContent`
-              : resolveApiMode(config.apiBaseUrl).url;
+              : resolveApiMode(config.apiBaseUrl, config.provider).url;
           throw new Error(toNetworkErrorMessage(failedUrl));
         }
 
