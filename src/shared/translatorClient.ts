@@ -125,15 +125,19 @@ function isOpenAiOfficialUrl(url: string) {
 }
 
 function buildGeminiThinkingConfig(model: string) {
-  if (/^gemini-3/i.test(model)) {
-    return {
-      thinkingConfig: {
-        thinkingLevel: "minimal"
-      }
-    };
-  }
+  const isReasoningModel =
+    /thinking|reasoning/i.test(model) ||
+    /^(gemini-2\.5|gemini-[3-9]|gemma-[4-9])/i.test(model);
 
-  if (/^gemini-2\.5/i.test(model)) {
+  if (isReasoningModel) {
+    if (/^gemini-3/i.test(model)) {
+      return {
+        thinkingConfig: {
+          thinkingLevel: "minimal"
+        }
+      };
+    }
+
     return {
       thinkingConfig: {
         thinkingBudget: 0

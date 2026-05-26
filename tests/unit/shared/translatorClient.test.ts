@@ -538,6 +538,96 @@ describe("translator client", () => {
     expect(result).toEqual({ alpha: "第一段" });
   });
 
+  it("uses zero thinking budget for Gemma 4 native requests", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      alpha: "第一段"
+                    })
+                  }
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "google-gemini",
+        apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+        apiKey: "secret-key",
+        model: "gemma-4-31b-it",
+        translateTitles: true,
+        translateShortContentBlocks: true
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(result).toEqual({ alpha: "第一段" });
+  });
+
+  it("uses zero thinking budget for explicit thinking models", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      alpha: "第一段"
+                    })
+                  }
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const result = await client.translateBlocks({
+      config: buildPersistedConfigRecord({
+        provider: "google-gemini",
+        apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+        apiKey: "secret-key",
+        model: "gemini-2.0-flash-thinking-exp",
+        translateTitles: true,
+        translateShortContentBlocks: true
+      }),
+      blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+    });
+
+    expect(result).toEqual({ alpha: "第一段" });
+  });
+
   it("surfaces Gemini HTTP error bodies instead of misclassifying them as network failures", async () => {
     const fetchMock = vi.fn(async () => {
       return new Response(
