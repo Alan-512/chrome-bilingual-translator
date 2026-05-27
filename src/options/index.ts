@@ -242,16 +242,15 @@ async function bootstrap() {
 
   await mountOptionsPage(document, {
     storageArea: createChromeStorageArea(chrome.storage.local),
-    requestApiOriginPermission: async (origin) => {
+    requestApiOriginPermission: (origin) => {
       if (!chrome.permissions) {
-        return true;
+        return Promise.resolve(true);
       }
 
-      const granted = await chrome.permissions.contains({ origins: [`${origin}/*`] });
-      if (granted) {
-        return true;
-      }
-
+      // We call chrome.permissions.request synchronously inside the user gesture handler.
+      // Doing this without any preceding await keeps the user gesture active, preventing
+      // Manifest V3 "must be called during a user gesture" errors.
+      // If the origin permission is already granted, it resolves to true instantly without prompt.
       return chrome.permissions.request({ origins: [`${origin}/*`] });
     },
     testApiConnection: async (config) => {
