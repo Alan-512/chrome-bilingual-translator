@@ -142,44 +142,61 @@ function applyProviderPreset(controls: OptionsFormControls) {
   }
 }
 
-async function testApiConfiguration(
+function testApiConfiguration(
   controls: OptionsFormControls,
   dependencies: OptionsPageDependencies,
   doc: Document
 ) {
-  const nextConfig = buildPersistedConfigRecord(collectFormInput(controls));
-  const securityError = getApiBaseUrlSecurityError(nextConfig.apiBaseUrl);
-  if (securityError) {
-    setStatus(controls.status, securityError, "error");
-    showToast(doc, securityError, "error");
-    return;
-  }
-
-  const permissionGranted = nextConfig.apiOrigin
-    ? await dependencies.requestApiOriginPermission(nextConfig.apiOrigin)
-    : false;
-  if (nextConfig.apiOrigin && !permissionGranted) {
-    setStatus(controls.status, "API origin permission was denied.", "error");
-    showToast(doc, "API origin permission was denied.", "error");
-    return;
-  }
-
-  controls.testApi.disabled = true;
-  const originalLabel = controls.testApi.textContent;
-  controls.testApi.textContent = "Testing...";
-
   try {
-    await dependencies.testApiConnection(collectFormInput(controls));
+    const nextConfig = buildPersistedConfigRecord(collectFormInput(controls));
+    const securityError = getApiBaseUrlSecurityError(nextConfig.apiBaseUrl);
+    if (securityError) {
+      setStatus(controls.status, securityError, "error");
+      showToast(doc, securityError, "error");
+      return;
+    }
 
-    setStatus(controls.status, "API connection succeeded.", "success");
-    showToast(doc, "API connection succeeded.", "success");
+    const permissionPromise = nextConfig.apiOrigin
+      ? dependencies.requestApiOriginPermission(nextConfig.apiOrigin)
+      : Promise.resolve(true);
+
+    permissionPromise
+      .then((permissionGranted) => {
+        if (nextConfig.apiOrigin && !permissionGranted) {
+          setStatus(controls.status, "API origin permission was denied.", "error");
+          showToast(doc, "API origin permission was denied.", "error");
+          return;
+        }
+
+        controls.testApi.disabled = true;
+        const originalLabel = controls.testApi.textContent;
+        controls.testApi.textContent = "Testing...";
+
+        dependencies
+          .testApiConnection(collectFormInput(controls))
+          .then(() => {
+            setStatus(controls.status, "API connection succeeded.", "success");
+            showToast(doc, "API connection succeeded.", "success");
+          })
+          .catch((error) => {
+            const message = error instanceof Error ? error.message : "API connection failed.";
+            setStatus(controls.status, message, "error");
+            showToast(doc, message, "error");
+          })
+          .finally(() => {
+            controls.testApi.disabled = false;
+            controls.testApi.textContent = originalLabel;
+          });
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "Failed to request permission.";
+        setStatus(controls.status, message, "error");
+        showToast(doc, message, "error");
+      });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "API connection failed.";
+    const message = error instanceof Error ? error.message : "An unexpected error occurred.";
     setStatus(controls.status, message, "error");
     showToast(doc, message, "error");
-  } finally {
-    controls.testApi.disabled = false;
-    controls.testApi.textContent = originalLabel;
   }
 }
 
@@ -205,33 +222,54 @@ export async function mountOptionsPage(
   });
 
   controls.testApi.addEventListener("click", () => {
-    void testApiConfiguration(controls, dependencies, doc);
+    testApiConfiguration(controls, dependencies, doc);
   });
 
-  controls.form.addEventListener("submit", async (event) => {
+  controls.form.addEventListener("submit", (event) => {
     event.preventDefault();
 
-    const nextConfig = buildPersistedConfigRecord(collectFormInput(controls));
-    const securityError = getApiBaseUrlSecurityError(nextConfig.apiBaseUrl);
-    if (securityError) {
-      setStatus(controls.status, securityError, "error");
-      showToast(doc, securityError, "error");
-      return;
+    try {
+      const nextConfig = buildPersistedConfigRecord(collectFormInput(controls));
+      const securityError = getApiBaseUrlSecurityError(nextConfig.apiBaseUrl);
+      if (securityError) {
+        setStatus(controls.status, securityError, "error");
+        showToast(doc, securityError, "error");
+        return;
+      }
+
+      const permissionPromise = nextConfig.apiOrigin
+        ? dependencies.requestApiOriginPermission(nextConfig.apiOrigin)
+        : Promise.resolve(true);
+
+      permissionPromise
+        .then((permissionGranted) => {
+          if (nextConfig.apiOrigin && !permissionGranted) {
+            setStatus(controls.status, "API origin permission was denied.", "error");
+            showToast(doc, "API origin permission was denied.", "error");
+            return;
+          }
+
+          saveExtensionConfig(dependencies.storageArea, nextConfig)
+            .then(() => {
+              setStatus(controls.status, "Configuration saved.", "success");
+              showToast(doc, "Configuration saved.", "success");
+            })
+            .catch((err) => {
+              const message = err instanceof Error ? err.message : "Failed to save configuration.";
+              setStatus(controls.status, message, "error");
+              showToast(doc, message, "error");
+            });
+        })
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : "Failed to request permission.";
+          setStatus(controls.status, message, "error");
+          showToast(doc, message, "error");
+        });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setStatus(controls.status, message, "error");
+      showToast(doc, message, "error");
     }
-
-    const permissionGranted = nextConfig.apiOrigin
-      ? await dependencies.requestApiOriginPermission(nextConfig.apiOrigin)
-      : false;
-
-    if (nextConfig.apiOrigin && !permissionGranted) {
-      setStatus(controls.status, "API origin permission was denied.", "error");
-      showToast(doc, "API origin permission was denied.", "error");
-      return;
-    }
-
-    await saveExtensionConfig(dependencies.storageArea, nextConfig);
-    setStatus(controls.status, "Configuration saved.", "success");
-    showToast(doc, "Configuration saved.", "success");
   });
 }
 
