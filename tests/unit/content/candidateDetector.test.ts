@@ -518,7 +518,7 @@ describe("collectCandidateBlocks", () => {
       "github|repo-home|readme|body|0|Turn a single Claude Code session into a full game development studio."
     );
     expect(blocks[2]?.rehydrateKey).toBe("github|repo-home|about|body|0|Turn Claude Code into a full game dev studio.");
-    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstReadmeParagraph);
+    expect(blocks[0]?.renderHint?.anchorElement).toBeUndefined();
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(readme);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(readme);
     expect(blocks[2]?.renderHint?.expansionRoot).toBe(about);
@@ -591,7 +591,7 @@ describe("collectCandidateBlocks", () => {
     ]);
     expect(blocks[0]?.rehydrateKey).toBe("openrouter|listing|OpenAI: GPT-4o Mini TTS");
     expect(blocks[1]?.rehydrateKey).toBe("openrouter|listing|GPT-4o Mini TTS is OpenAI's cost-efficient text-to-speech model.");
-    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstModelSummary);
+    expect(blocks[0]?.renderHint?.anchorElement).toBeUndefined();
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(firstModelCard);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(firstModelCard);
   });
@@ -710,7 +710,7 @@ describe("collectCandidateBlocks", () => {
     ]);
     expect(blocks[0]?.rehydrateKey).toBe("producthunt|detail|main|Build Check (for Outsiders)");
     expect(blocks[1]?.rehydrateKey).toBe("producthunt|detail|main|Is your app idea actually worth building?");
-    expect(blocks[0]?.renderHint?.anchorElement).toBe(firstSummaryParagraph);
+    expect(blocks[0]?.renderHint?.anchorElement).toBeUndefined();
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(productMain);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(productMain);
   });

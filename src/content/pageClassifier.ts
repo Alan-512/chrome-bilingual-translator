@@ -27,7 +27,7 @@ function looksLikeProductHuntDocument(doc: Document): boolean {
   }
 
   return (
-    doc.querySelector("[data-producthunt-main], main article, [data-test='product-main'], [data-sentry-component='ProductPage']") !==
+    doc.querySelector("[data-producthunt-main], [data-test='product-main'], [data-sentry-component='ProductPage']") !==
     null
   );
 }

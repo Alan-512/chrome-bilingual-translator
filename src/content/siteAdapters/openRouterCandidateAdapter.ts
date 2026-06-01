@@ -79,16 +79,13 @@ export function collectOpenRouterCandidateBlock(
     return null;
   }
 
-  const summaryElement = allowedRoot.querySelector<HTMLElement>("p, li, blockquote");
-  const isTitleElement = /^H[1-6]$/.test(element.tagName);
-
   return {
     blockId: helpers.getStableBlockId(element),
     element,
     sourceText,
     rehydrateKey: `openrouter|${page.surface}|${normalizeText(sourceText)}`,
     renderHint: {
-      anchorElement: isTitleElement ? summaryElement ?? undefined : undefined,
+      anchorElement: undefined,
       expansionRoot: resolveExpansionRoot(allowedRoot)
     }
   };

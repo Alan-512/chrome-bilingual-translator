@@ -291,15 +291,12 @@ function getOrCreateTranslationElement(
   applyHorizontalLayoutFromAnchor(translationElement, anchorElement);
 
   const doc = sourceElement.ownerDocument;
-  const page = classifyPage(doc);
-  const isGeneric = page.site === "generic";
-
   const parent = anchorElement.parentElement;
   const parentStyle = parent ? parent.ownerDocument.defaultView?.getComputedStyle(parent) : null;
   const parentDisplay = parentStyle?.display ?? "";
   
-  const isParentFlexOrGrid = isGeneric && (parentDisplay === "flex" || parentDisplay === "inline-flex" || parentDisplay === "grid" || parentDisplay === "inline-grid");
-  const isParentTable = isGeneric && (parentDisplay === "table" || parentDisplay === "inline-table" || parentDisplay === "table-row" || parentDisplay === "table-row-group");
+  const isParentFlexOrGrid = parentDisplay === "flex" || parentDisplay === "inline-flex" || parentDisplay === "grid" || parentDisplay === "inline-grid";
+  const isParentTable = parentDisplay === "table" || parentDisplay === "inline-table" || parentDisplay === "table-row" || parentDisplay === "table-row-group";
   
   const tagName = anchorElement.tagName.toLowerCase();
   const isListOrDefinition = tagName === "li" || tagName === "dt" || tagName === "dd";
@@ -361,20 +358,37 @@ function parsePixelValue(value: string | null | undefined): number | null {
   return match ? Number(match[1]) : null;
 }
 
-function parseTranslateY(value: string | null | undefined): number | null {
-  if (!value || value === "none") {
-    return null;
+function parseTranslateY(transformValue: string | null | undefined, translateValue: string | null | undefined): number | null {
+  // 1. Prioritize individual 'translate' property if both are present
+  // CSS spec: single-value translate "X" defaults Y to "0px"
+  if (translateValue && translateValue !== "none") {
+    const parts = translateValue.trim().split(/\s+/);
+    const yPart = parts.length >= 2 ? parts[1] : "0px";
+    const match = yPart.match(/([-+]?\d+(?:\.\d+)?)(px|%|em|rem)?/);
+    if (match) return Number(match[1]);
   }
 
-  const translateMatch = value.match(/translateY\((-?\d+(?:\.\d+)?)px\)/);
-  if (translateMatch) {
-    return Number(translateMatch[1]);
-  }
+  if (!transformValue || transformValue === "none") return null;
 
-  const matrixMatch = value.match(/matrix\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,\s*(-?\d+(?:\.\d+)?)\)/);
-  if (matrixMatch) {
-    return Number(matrixMatch[1]);
-  }
+  // 2. transform: translate(x, y) supporting both space and comma separation
+  const translateMatch = transformValue.match(/translate\(\s*[^,\s]+[\s,]\s*([-+]?\d+(?:\.\d+)?)(?:px)?\)/);
+  if (translateMatch) return Number(translateMatch[1]);
+
+  // 3. translate3d(x, y, z)
+  const translate3dMatch = transformValue.match(/translate3d\([^,]+,\s*([-+]?\d+(?:\.\d+)?)(?:px)?,[^)]+\)/);
+  if (translate3dMatch) return Number(translate3dMatch[1]);
+
+  // 4. translateY(y)
+  const translateYMatch = transformValue.match(/translateY\(([-+]?\d+(?:\.\d+)?)(?:px)?\)/);
+  if (translateYMatch) return Number(translateYMatch[1]);
+
+  // 5. 2D Matrix (ty is 6th param at index 5)
+  const matrixMatch = transformValue.match(/matrix\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,\s*([-+]?\d+(?:\.\d+)?)\)/);
+  if (matrixMatch) return Number(matrixMatch[1]);
+
+  // 6. 3D Matrix (ty is 14th param at index 13)
+  const matrix3dMatch = transformValue.match(/matrix3d\((?:[^,]+,){13}\s*([-+]?\d+(?:\.\d+)?)[^)]*\)/);
+  if (matrix3dMatch) return Number(matrix3dMatch[1]);
 
   return null;
 }
@@ -394,44 +408,125 @@ function getVirtualRowBaseHeight(row: HTMLElement): number {
 }
 
 function getVirtualRowBaseY(row: HTMLElement): number {
+  const computedStyle = row.ownerDocument.defaultView?.getComputedStyle(row);
+  const transform = row.style.transform || computedStyle?.transform || "";
+  const translate = row.style.translate || computedStyle?.translate || "";
+  
+  const parsedCurrentY = parseTranslateY(transform, translate) ?? 0;
+  const appliedYAttr = row.getAttribute("data-bilingual-translator-applied-y");
+  const appliedY = appliedYAttr !== null ? Number(appliedYAttr) : null;
+
+  // Invalidate cached baseline Y-coordinate if changed by the external scroller
+  if (appliedY !== null && Math.abs(parsedCurrentY - appliedY) > 0.1) {
+    row.removeAttribute(VIRTUAL_ROW_BASE_Y_ATTRIBUTE);
+    row.removeAttribute("data-bilingual-translator-applied-y");
+  }
+
   const storedYAttribute = row.getAttribute(VIRTUAL_ROW_BASE_Y_ATTRIBUTE);
   const storedY = Number(storedYAttribute);
   if (storedYAttribute !== null && Number.isFinite(storedY)) {
     return storedY;
   }
 
-  const computedStyle = row.ownerDocument.defaultView?.getComputedStyle(row);
-  const baseY = parseTranslateY(row.style.transform) ?? parseTranslateY(computedStyle?.transform) ?? 0;
-  row.setAttribute(VIRTUAL_ROW_BASE_Y_ATTRIBUTE, String(baseY));
-  return baseY;
+  row.setAttribute(VIRTUAL_ROW_BASE_Y_ATTRIBUTE, String(parsedCurrentY));
+  return parsedCurrentY;
 }
 
 function getVirtualListBaseHeight(list: HTMLElement): number {
+  const computedStyle = list.ownerDocument.defaultView?.getComputedStyle(list);
+  const currentHeightAttr = list.style.height || computedStyle?.height || "";
+  const parsedCurrentHeight = parsePixelValue(currentHeightAttr) ?? 0;
+
+  const appliedHeightAttr = list.getAttribute("data-bilingual-translator-applied-height");
+  const appliedHeight = appliedHeightAttr !== null ? Number(appliedHeightAttr) : null;
+
+  // Invalidate cached baseline height if modified by the external scroller
+  if (appliedHeight !== null && Math.abs(parsedCurrentHeight - appliedHeight) > 0.1) {
+    list.removeAttribute(VIRTUAL_LIST_BASE_HEIGHT_ATTRIBUTE);
+    list.removeAttribute("data-bilingual-translator-applied-height");
+  }
+
   const storedHeightAttribute = list.getAttribute(VIRTUAL_LIST_BASE_HEIGHT_ATTRIBUTE);
   const storedHeight = Number(storedHeightAttribute);
   if (storedHeightAttribute !== null && Number.isFinite(storedHeight) && storedHeight > 0) {
     return storedHeight;
   }
 
-  const computedStyle = list.ownerDocument.defaultView?.getComputedStyle(list);
-  const baseHeight =
-    parsePixelValue(list.style.height) ?? parsePixelValue(computedStyle?.height) ?? Math.ceil(list.getBoundingClientRect().height);
+  const baseHeight = parsePixelValue(list.style.height) ?? parsePixelValue(computedStyle?.height) ?? Math.ceil(list.getBoundingClientRect().height);
   list.setAttribute(VIRTUAL_LIST_BASE_HEIGHT_ATTRIBUTE, String(baseHeight));
   return baseHeight;
 }
 
+function updateTransformY(transform: string, targetY: number): string {
+  if (!transform || transform === "none") {
+    return `translateY(${targetY}px)`;
+  }
+
+  // 1. Replace 3D Matrix translateY component (14th parameter, index 13) first to avoid conflict with 2D matrix matching
+  if (/matrix3d\(/i.test(transform)) {
+    return transform.replace(/matrix3d\(([^)]+)\)/i, (match, p1) => {
+      const parts = p1.split(/\s*,\s*/);
+      if (parts.length === 16) {
+        parts[13] = String(targetY);
+        return `matrix3d(${parts.join(", ")})`;
+      }
+      return match;
+    });
+  }
+
+  // 2. Replace 2D Matrix translateY component (6th parameter, index 5)
+  if (/matrix\(/i.test(transform)) {
+    return transform.replace(
+      /matrix\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\)/i,
+      `matrix($1, $2, $3, $4, $5, ${targetY})`
+    );
+  }
+
+  // 3. Replace translateY(val)
+  if (/translateY\([^)]+\)/i.test(transform)) {
+    return transform.replace(/translateY\([^)]+\)/i, `translateY(${targetY}px)`);
+  }
+
+  // 4. Replace translate3d(x, y, z) preserving X and Z
+  if (/translate3d\(([^,]+),\s*[^,]+,\s*([^)]+)\)/i.test(transform)) {
+    return transform.replace(/translate3d\(([^,]+),\s*[^,]+,\s*([^)]+)\)/i, `translate3d($1, ${targetY}px, $2)`);
+  }
+
+  // 5. Replace translate(x, y) preserving X
+  if (/translate\(([^,\s]+)[\s,]+[^)]+\)/i.test(transform)) {
+    return transform.replace(/translate\(([^,\s]+)[\s,]+[^)]+\)/i, `translate($1, ${targetY}px)`);
+  }
+
+  return `${transform} translateY(${targetY}px)`.trim();
+}
+
+function updateTranslateY(translate: string, targetY: number): string {
+  if (!translate || translate === "none") {
+    return `0px ${targetY}px`;
+  }
+  const parts = translate.trim().split(/\s+/);
+  const xPart = parts.length >= 1 ? parts[0] : "0px";
+  const zPart = parts.length >= 3 ? parts[2] : "";
+  return `${xPart} ${targetY}px ${zPart}`.trim();
+}
+
+const isVirtualizedRow = (el: HTMLElement) => {
+  const style = el.style;
+  const computedStyle = el.ownerDocument.defaultView?.getComputedStyle(el);
+  const position = style.position || computedStyle?.position;
+  if (position !== "absolute") return false;
+
+  const transform = style.transform || computedStyle?.transform || "";
+  const translate = style.translate || computedStyle?.translate || "";
+  return (transform !== "" && transform !== "none") || (translate !== "" && translate !== "none");
+};
+
 function resolveVirtualizedRow(expansionRoot?: HTMLElement): HTMLElement | null {
-  const row = expansionRoot?.matches("li[style*='translateY']") ? expansionRoot : expansionRoot?.closest<HTMLElement>("li[style*='translateY']");
-  if (!row?.parentElement) {
-    return null;
+  const row = expansionRoot && isVirtualizedRow(expansionRoot) ? expansionRoot : expansionRoot?.parentElement?.closest<HTMLElement>("li");
+  if (row && isVirtualizedRow(row) && row.parentElement) {
+    return row;
   }
-
-  const computedStyle = row.ownerDocument.defaultView?.getComputedStyle(row);
-  if (computedStyle?.position !== "absolute" && row.style.position !== "absolute") {
-    return null;
-  }
-
-  return row;
+  return null;
 }
 
 function updateVirtualizedListLayout(expansionRoot?: HTMLElement): void {
@@ -443,7 +538,7 @@ function updateVirtualizedListLayout(expansionRoot?: HTMLElement): void {
 
   const rows = Array.from(list.children)
     .filter((child): child is HTMLElement => child instanceof HTMLElement)
-    .filter((row) => row.matches("li[style*='translateY']"))
+    .filter(isVirtualizedRow)
     .sort((a, b) => getVirtualRowBaseY(a) - getVirtualRowBaseY(b));
 
   let accumulatedExtraHeight = 0;
@@ -455,12 +550,26 @@ function updateVirtualizedListLayout(expansionRoot?: HTMLElement): void {
 
     const expandedHeight = Math.max(baseHeight, Math.ceil(row.scrollHeight));
     row.style.height = `${expandedHeight}px`;
-    row.style.transform = `translateY(${baseY + accumulatedExtraHeight}px)`;
+
+    const targetY = baseY + accumulatedExtraHeight;
+    row.setAttribute("data-bilingual-translator-applied-y", String(targetY));
+
+    // Same-Source Style Writing Barrier with Non-Y & Matrix Overwrite Preservation
+    const computedStyle = row.ownerDocument.defaultView?.getComputedStyle(row);
+    const translate = row.style.translate || computedStyle?.translate || "";
+    if (translate !== "" && translate !== "none") {
+      row.style.translate = updateTranslateY(row.style.translate || translate, targetY);
+    } else {
+      row.style.transform = updateTransformY(row.style.transform || computedStyle?.transform || "", targetY);
+    }
+
     accumulatedExtraHeight += expandedHeight - baseHeight;
   });
 
   const listBaseHeight = getVirtualListBaseHeight(list);
-  list.style.height = `${listBaseHeight + accumulatedExtraHeight}px`;
+  const targetListHeight = listBaseHeight + accumulatedExtraHeight;
+  list.setAttribute("data-bilingual-translator-applied-height", String(targetListHeight));
+  list.style.height = `${targetListHeight}px`;
 }
 
 function normalizeText(text: string | null | undefined): string {

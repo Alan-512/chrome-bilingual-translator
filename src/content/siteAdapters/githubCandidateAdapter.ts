@@ -66,8 +66,6 @@ export function collectGitHubCandidateBlock(
     return null;
   }
 
-  const summaryElement = expansionRoot.querySelector<HTMLElement>("p, li, blockquote");
-  const isTitleElement = /^H[1-6]$/.test(element.tagName);
   const blockRole = getGitHubBlockRole(element);
   const blockIndex = getGitHubBlockIndex(expansionRoot, element);
 
@@ -77,7 +75,7 @@ export function collectGitHubCandidateBlock(
     sourceText,
     rehydrateKey: `github|${page.surface}|${getGitHubArea(expansionRoot)}|${blockRole}|${blockIndex}|${normalizeText(sourceText)}`,
     renderHint: {
-      anchorElement: isTitleElement ? summaryElement ?? undefined : undefined,
+      anchorElement: undefined,
       expansionRoot
     }
   };

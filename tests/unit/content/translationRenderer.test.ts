@@ -431,4 +431,68 @@ describe("renderTranslationBelow", () => {
     expect(term.querySelector("[data-bilingual-translator-owned='true']")?.textContent).toBe("术语");
     expect(desc.querySelector("[data-bilingual-translator-owned='true']")?.textContent).toBe("描述说明");
   });
+
+  it("appends translations inside the anchor element when the parent has a flex layout even on non-generic pages", () => {
+    document.body.innerHTML = `
+      <div class="markdown-body"></div>
+      <div style="display: flex;">
+        <p id="source">GitHub pull comment flex child</p>
+      </div>
+    `;
+    const source = document.getElementById("source") as HTMLParagraphElement;
+
+    renderTranslationBelow(source, {
+      blockId: "alpha",
+      translationText: "GitHub 弹性布局子元素翻译"
+    });
+
+    expect(source.nextElementSibling).toBeNull();
+    const translation = source.querySelector("[data-bilingual-translator-owned='true']") as HTMLElement;
+    expect(translation).not.toBeNull();
+    expect(translation.textContent).toBe("GitHub 弹性布局子元素翻译");
+  });
+
+  it("preserves non-Y transform components (matrix, translate X/Z, matrix3d) during same-source writebacks in virtual lists", () => {
+    document.body.innerHTML = `
+      <ul id="list" style="height: 500px;">
+        <li id="row1" style="position: absolute; transform: matrix(1, 0, 0, 1, 10, 100); height: 50px;">Row 1</li>
+        <li id="row2" style="position: absolute; translate: 20px 200px 30px; height: 50px;">Row 2</li>
+        <li id="row3" style="position: absolute; transform: matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 30, 300, 40, 1); height: 50px;">Row 3</li>
+      </ul>
+    `;
+    const row1 = document.getElementById("row1") as HTMLLIElement;
+    const row2 = document.getElementById("row2") as HTMLLIElement;
+    const row3 = document.getElementById("row3") as HTMLLIElement;
+
+    Object.defineProperty(row1, "scrollHeight", { value: 80, configurable: true });
+    Object.defineProperty(row2, "scrollHeight", { value: 90, configurable: true });
+
+    renderTranslationBelow(row1, {
+      blockId: "alpha",
+      translationText: "译文 1",
+      expansionRoot: row1
+    });
+
+    renderTranslationBelow(row2, {
+      blockId: "beta",
+      translationText: "译文 2",
+      expansionRoot: row2
+    });
+
+    renderTranslationBelow(row3, {
+      blockId: "gamma",
+      translationText: "译文 3",
+      expansionRoot: row3
+    });
+
+    // Check that row1 (positioned via matrix) preserved original X (10) and matrix parameters, only Y modified if shifted
+    expect(row1.style.transform).toBe("matrix(1, 0, 0, 1, 10, 100)");
+
+    // Check that row2 (positioned via translate) preserved original X (20px) and Z (30px), Y shifted correctly by row1's translation extra height
+    const row2Translate = row2.style.translate;
+    expect(row2Translate).toBe("20px 230px 30px");
+
+    // Check that row3 (positioned via matrix3d) preserved original parameters and was shifted correctly
+    expect(row3.style.transform).toBe("matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 30, 370, 40, 1)");
+  });
 });

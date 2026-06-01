@@ -55,6 +55,47 @@ function isExtensionOwned(element: Element): boolean {
   return element.closest("[data-bilingual-translator-owned='true']") !== null;
 }
 
+function isInsideShadowRoot(node: Node): boolean {
+  return node.nodeType === 11 && "host" in node;
+}
+
+function isElementTrulyHidden(element: HTMLElement): boolean {
+  const visited = new Set<Element>();
+  let current: Element | null = element;
+  while (current) {
+    if (visited.has(current)) {
+      break;
+    }
+    visited.add(current);
+    if (current.nodeType === 1) {
+      const el = current as HTMLElement;
+      if (el.hidden || el.getAttribute("aria-hidden") === "true") {
+        return true;
+      }
+      if (el.style.display === "none" || el.style.visibility === "hidden") {
+        return true;
+      }
+      const style = el.ownerDocument.defaultView?.getComputedStyle(el);
+      if (style && (style.display === "none" || style.visibility === "hidden")) {
+        return true;
+      }
+    }
+
+    const parent = current.parentElement;
+    if (parent) {
+      current = parent;
+    } else {
+      const root = current.getRootNode();
+      if (isInsideShadowRoot(root)) {
+        current = (root as ShadowRoot).host;
+      } else {
+        break;
+      }
+    }
+  }
+  return false;
+}
+
 function isHidden(element: HTMLElement): boolean {
   if (element.hidden || element.getAttribute("aria-hidden") === "true") {
     return true;
@@ -65,8 +106,10 @@ function isHidden(element: HTMLElement): boolean {
   }
 
   const isJsdom = element.ownerDocument.defaultView?.navigator.userAgent.includes("jsdom") ?? false;
+  const rootNode = element.getRootNode();
+  const insideShadow = isInsideShadowRoot(rootNode);
 
-  if (!isJsdom) {
+  if (!insideShadow && !isJsdom) {
     if (element.offsetParent === null && element.tagName !== "BODY" && element.tagName !== "HTML") {
       const style = element.ownerDocument.defaultView?.getComputedStyle(element);
       if (style && style.position !== "fixed") {
@@ -78,6 +121,10 @@ function isHidden(element: HTMLElement): boolean {
     if (style && (style.display === "none" || style.visibility === "hidden")) {
       return true;
     }
+  }
+
+  if (isElementTrulyHidden(element)) {
+    return true;
   }
 
   return (
@@ -247,8 +294,8 @@ function getStableBlockId(element: HTMLElement): string {
 }
 
 export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
-  const elements = Array.from(root.querySelectorAll<HTMLElement>(CONTENT_SELECTOR));
-  const doc = root instanceof Document ? root : root.ownerDocument;
+  const matchedElements = new Set<HTMLElement>();
+  const doc = root.nodeType === 9 ? (root as Document) : root.ownerDocument || document;
   const page = classifyPage(doc);
   const siteCandidates: CandidateBlock[] = [];
   const genericCandidates: CandidateBlock[] = [];
@@ -256,7 +303,25 @@ export function collectCandidateBlocks(root: ParentNode): CandidateBlock[] {
   const groupedStructuredRootElements: HTMLElement[] = [];
   let matchedSiteCandidate = false;
 
-  elements.forEach((element) => {
+  function traverse(node: ParentNode) {
+    if (node.nodeType === 1 && (node as Element).matches(CONTENT_SELECTOR)) {
+      matchedElements.add(node as HTMLElement);
+    }
+
+    const currentMatches = Array.from(node.querySelectorAll<HTMLElement>(CONTENT_SELECTOR));
+    currentMatches.forEach((el) => matchedElements.add(el));
+
+    const allElements = Array.from(node.querySelectorAll<HTMLElement>("*"));
+    allElements.forEach((el) => {
+      if (el.shadowRoot) {
+        traverse(el.shadowRoot);
+      }
+    });
+  }
+
+  traverse(root);
+
+  matchedElements.forEach((element) => {
     if (isExtensionOwned(element) || isHidden(element)) {
       return;
     }

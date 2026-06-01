@@ -3,7 +3,6 @@ import type { PageClassification } from "../pageClassifier";
 
 const PRODUCT_HUNT_ALLOWED_ROOT_SELECTOR = [
   "[data-producthunt-main]",
-  "main article",
   "[data-test='product-main']",
   "[data-sentry-component='ProductPage']"
 ].join(", ");
@@ -35,16 +34,13 @@ export function collectProductHuntCandidateBlock(
     return null;
   }
 
-  const firstSummaryParagraph =
-    element.tagName === "H1" ? allowedRoot.querySelector<HTMLElement>("p, li, blockquote") ?? undefined : undefined;
-
   return {
     blockId: helpers.getStableBlockId(element),
     element,
     sourceText,
     rehydrateKey: `producthunt|${page.surface}|main|${normalizeText(sourceText)}`,
     renderHint: {
-      anchorElement: firstSummaryParagraph,
+      anchorElement: undefined,
       expansionRoot: allowedRoot
     }
   };
