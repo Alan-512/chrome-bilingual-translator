@@ -654,6 +654,12 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
     },
 
     async translateOrExplainSelection({ config, action, selectionText, contextText }) {
+      const cacheKey = `selection:${action}:${selectionText}`;
+      const cachedResult = await options.cache.get(cacheKey, config.targetLanguage);
+      if (cachedResult) {
+        return cachedResult;
+      }
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -735,7 +741,13 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           throw new Error("Selection translation/explanation response did not include a content payload.");
         }
 
-        return content.trim();
+        const finalResult = content.trim();
+        await options.cache.setMany(
+          [{ sourceText: cacheKey, translation: finalResult }],
+          config.targetLanguage
+        );
+
+        return finalResult;
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) {
           throw new Error(toTimeoutErrorMessage(timeoutMs));

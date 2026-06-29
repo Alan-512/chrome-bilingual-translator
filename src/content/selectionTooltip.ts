@@ -165,9 +165,24 @@ export function getSelectionAndContext(): SelectionContext | null {
     return null;
   }
 
+  const finalSelectionText = selectionText.trim();
+  let finalContextText = contextText.trim() || finalSelectionText;
+
+  const maxContextChars = 1000;
+  if (finalContextText.length > maxContextChars) {
+    const selIndex = finalContextText.indexOf(finalSelectionText);
+    if (selIndex !== -1) {
+      const start = Math.max(0, selIndex - Math.floor((maxContextChars - finalSelectionText.length) / 2));
+      const end = Math.min(finalContextText.length, start + maxContextChars);
+      finalContextText = finalContextText.substring(start, end);
+    } else {
+      finalContextText = finalContextText.substring(0, maxContextChars);
+    }
+  }
+
   return {
-    selectionText: selectionText.trim(),
-    contextText: contextText.trim() || selectionText.trim(),
+    selectionText: finalSelectionText,
+    contextText: finalContextText,
     rect
   };
 }

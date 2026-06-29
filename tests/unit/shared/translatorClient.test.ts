@@ -882,4 +882,58 @@ describe("translator client", () => {
     expect(result).toBe("hello");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("caches selection translation/explanation results and returns them without calling API", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "cached-hello"
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    const config = buildPersistedConfigRecord({
+      provider: "openai-compatible",
+      apiBaseUrl: "https://api.example.com/v1/chat/completions",
+      apiKey: "secret-key",
+      model: "gpt-5-mini",
+      translateTitles: true,
+      translateShortContentBlocks: true,
+      targetLanguage: "ja"
+    });
+
+    // First call (cache miss)
+    const result1 = await client.translateOrExplainSelection({
+      config,
+      action: "translate",
+      selectionText: "hello",
+      contextText: "hello world"
+    });
+
+    expect(result1).toBe("cached-hello");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Second call (cache hit)
+    const result2 = await client.translateOrExplainSelection({
+      config,
+      action: "translate",
+      selectionText: "hello",
+      contextText: "hello world"
+    });
+
+    expect(result2).toBe("cached-hello");
+    expect(fetchMock).toHaveBeenCalledTimes(1); // should still be 1 (no new fetch)
+  });
 });
