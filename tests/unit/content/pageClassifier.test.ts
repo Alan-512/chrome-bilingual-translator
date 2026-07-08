@@ -25,6 +25,20 @@ describe("classifyPage", () => {
     });
   });
 
+  it("classifies X status detail pages as social feed detail pages", () => {
+    expect(classifyPage(createLocationDocument("https://x.com/thstotiaux/status/1942073486123456789"))).toEqual({
+      site: "x",
+      surface: "detail"
+    });
+  });
+
+  it("classifies X home and feed pages as social feed listing pages", () => {
+    expect(classifyPage(createLocationDocument("https://x.com/home"))).toEqual({
+      site: "x",
+      surface: "listing"
+    });
+  });
+
   it("falls back to generic pages for non-Reddit sites", () => {
     expect(classifyPage(createLocationDocument("https://example.com/docs"))).toEqual({
       site: "generic",
@@ -107,6 +121,22 @@ describe("classifyPage", () => {
     expect(classifyPage(document)).toEqual({
       site: "producthunt",
       surface: "detail"
+    });
+  });
+
+  it("classifies X-like social feed pages from tweet DOM signatures even on localhost", () => {
+    window.history.replaceState({}, "", "/x-post-detail");
+    document.body.innerHTML = `
+      <main>
+        <article data-testid="tweet">
+          <div data-testid="tweetText" lang="en">Closing this week. Hope to see many of you there.</div>
+        </article>
+      </main>
+    `;
+
+    expect(classifyPage(document)).toEqual({
+      site: "x",
+      surface: "listing"
     });
   });
 });

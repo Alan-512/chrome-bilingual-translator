@@ -1,5 +1,5 @@
 export type PageClassification = {
-  site: "reddit" | "github" | "openrouter" | "producthunt" | "google-search" | "generic";
+  site: "reddit" | "github" | "openrouter" | "producthunt" | "google-search" | "x" | "generic";
   surface: "listing" | "detail" | "repo-home" | "repo-subpage" | "product-home" | "generic";
 };
 
@@ -44,9 +44,26 @@ function looksLikeGoogleSearchDocument(doc: Document): boolean {
   );
 }
 
+function looksLikeXDocument(doc: Document): boolean {
+  if (typeof doc.querySelector !== "function") {
+    return false;
+  }
+
+  return doc.querySelector("article[data-testid='tweet'] [data-testid='tweetText'][lang], [role='article'] [data-testid='tweetText'][lang]") !== null;
+}
+
 export function classifyPage(doc: Document): PageClassification {
   const host = doc.location?.hostname ?? "";
   const pathname = doc.location?.pathname ?? "";
+  const looksLikeXHost = host === "x.com" || host.endsWith(".x.com") || host === "twitter.com" || host.endsWith(".twitter.com");
+
+  if (looksLikeXHost || looksLikeXDocument(doc)) {
+    return {
+      site: "x",
+      surface: /\/status\/\d+/.test(pathname) ? "detail" : "listing"
+    };
+  }
+
   const looksLikeRedditHost = /(\.|^)reddit\.com$/i.test(host);
   const looksLikeRedditPath = /^\/r\/[^/]+(?:\/|$)/.test(pathname);
 

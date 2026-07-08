@@ -1,4 +1,5 @@
-import type { CandidateBlock } from "../candidateDetector";
+import type { CandidateBlock } from "../candidateTypes";
+import { normalizeText } from "../core/textUtils";
 import type { PageClassification } from "../pageClassifier";
 
 const GITHUB_ALLOWED_ROOT_SELECTOR = [
@@ -17,10 +18,6 @@ const GITHUB_EXPANSION_ROOT_SELECTOR = [
 type GitHubAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
 };
-
-function normalizeText(text: string) {
-  return text.replace(/\s+/g, " ").trim();
-}
 
 function getGitHubArea(expansionRoot: HTMLElement) {
   if (expansionRoot.matches("#readme")) {
@@ -45,7 +42,7 @@ function getGitHubBlockIndex(expansionRoot: HTMLElement, element: HTMLElement) {
   return index >= 0 ? index : 0;
 }
 
-export function collectGitHubCandidateBlock(
+export function collectGitHubDocsRepoCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
   helpers: GitHubAdapterHelpers
@@ -61,7 +58,7 @@ export function collectGitHubCandidateBlock(
 
   const expansionRoot = element.closest<HTMLElement>(GITHUB_EXPANSION_ROOT_SELECTOR) ?? allowedRoot;
 
-  const sourceText = element.textContent?.replace(/\s+/g, " ").trim() ?? "";
+  const sourceText = normalizeText(element.textContent);
   if (!sourceText) {
     return null;
   }

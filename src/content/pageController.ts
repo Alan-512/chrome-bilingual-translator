@@ -9,6 +9,7 @@ import {
 } from "./translationRenderer";
 import { ensureStatusPill, updateStatusPill } from "./statusPill";
 import { isExtensionContextInvalidatedError } from "./runtimeMessaging";
+import { normalizeText } from "./core/textUtils";
 
 type ObserverCoordinatorLike = {
   start(candidates: HTMLElement[], callbacks: { onVisible: (elements: HTMLElement[]) => void; onMutation: () => void }): void;
@@ -39,7 +40,7 @@ type QueuedBatch = {
 };
 
 function normalizeSourceText(text: string) {
-  return text.replace(/\s+/g, " ").trim();
+  return normalizeText(text);
 }
 
 function isSamePagePath(url1: string, url2: string): boolean {

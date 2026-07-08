@@ -223,6 +223,45 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(feedCard);
   });
 
+  it("collects X tweet bodies without translating surrounding action chrome", () => {
+    window.history.replaceState({}, "", "/x-post-detail");
+    document.body.innerHTML = `
+      <main>
+        <h1>Post</h1>
+        <article data-testid="tweet">
+          <div>
+            <a href="/thstotiaux/status/1942073486123456789"><time>Jul 7</time></a>
+            <div data-testid="User-Name">Tibo @thstotiaux</div>
+            <div data-testid="tweetText" lang="en">
+              Closing this week. Much of the teams building ChatGPT, Codex and OpenClaw will be there.
+            </div>
+            <div role="group">
+              <button data-testid="reply">Reply</button>
+              <button data-testid="retweet">Repost</button>
+              <button data-testid="like">Like</button>
+            </div>
+          </div>
+          <div>
+            <article data-testid="tweet">
+              <div data-testid="tweetText" lang="en">Applications to attend OpenAI DevDay are open.</div>
+            </article>
+          </div>
+        </article>
+        <aside><h2>Relevant people</h2></aside>
+      </main>
+    `;
+
+    const blocks = collectCandidateBlocks(document);
+
+    expect(blocks.map((block) => block.sourceText)).toEqual([
+      "Closing this week. Much of the teams building ChatGPT, Codex and OpenClaw will be there.",
+      "Applications to attend OpenAI DevDay are open."
+    ]);
+    expect(blocks.some((block) => block.sourceText === "Post")).toBe(false);
+    expect(blocks.some((block) => block.sourceText.includes("Reply"))).toBe(false);
+    expect(blocks.every((block) => block.rehydrateKey?.startsWith("social-feed|x|"))).toBe(true);
+  });
+
   it("keeps Reddit listing title separate while grouping semantic body children into one body block", () => {
     window.history.replaceState({}, "", "/r/vibecoding/");
     document.body.innerHTML = `

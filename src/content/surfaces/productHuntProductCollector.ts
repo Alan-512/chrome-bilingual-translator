@@ -1,4 +1,5 @@
-import type { CandidateBlock } from "../candidateDetector";
+import type { CandidateBlock } from "../candidateTypes";
+import { normalizeText } from "../core/textUtils";
 import type { PageClassification } from "../pageClassifier";
 
 const PRODUCT_HUNT_ALLOWED_ROOT_SELECTOR = [
@@ -11,11 +12,7 @@ type ProductHuntAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
 };
 
-function normalizeText(text: string) {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-export function collectProductHuntCandidateBlock(
+export function collectProductHuntProductCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
   helpers: ProductHuntAdapterHelpers
@@ -29,7 +26,7 @@ export function collectProductHuntCandidateBlock(
     return null;
   }
 
-  const sourceText = element.textContent?.replace(/\s+/g, " ").trim() ?? "";
+  const sourceText = normalizeText(element.textContent);
   if (!sourceText) {
     return null;
   }

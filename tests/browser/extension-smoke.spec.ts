@@ -6,20 +6,37 @@ import { chromium, expect, test } from "@playwright/test";
 
 test.setTimeout(60_000);
 
-const projectRoot = "/mnt/d/project/chrome-bilingual-translator";
-const playwrightCacheRoot = "/home/seed/.cache/ms-playwright";
+const projectRoot = process.cwd();
+const playwrightCacheRoots = [
+  process.env.PLAYWRIGHT_BROWSERS_PATH,
+  path.join(process.env.HOME ?? "", ".cache", "ms-playwright"),
+  path.join(process.env.USERPROFILE ?? "", "AppData", "Local", "ms-playwright"),
+  "/home/seed/.cache/ms-playwright"
+].filter((candidate): candidate is string => Boolean(candidate));
 
 function resolveExistingChromiumExecutable(): string {
-  const candidates = fs
-    .readdirSync(playwrightCacheRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith("chromium-"))
-    .map((entry) => path.join(playwrightCacheRoot, entry.name, "chrome-linux64", "chrome"))
-    .filter((candidatePath) => fs.existsSync(candidatePath))
-    .sort()
-    .reverse();
+  const defaultExecutablePath = chromium.executablePath();
+  if (fs.existsSync(defaultExecutablePath)) {
+    return defaultExecutablePath;
+  }
+
+  const candidates = playwrightCacheRoots.flatMap((cacheRoot) => {
+    if (!fs.existsSync(cacheRoot)) {
+      return [];
+    }
+
+    return fs
+      .readdirSync(cacheRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith("chromium-"))
+      .flatMap((entry) => [
+        path.join(cacheRoot, entry.name, "chrome-linux64", "chrome"),
+        path.join(cacheRoot, entry.name, "chrome-win", "chrome.exe")
+      ])
+      .filter((candidatePath) => fs.existsSync(candidatePath));
+  }).sort().reverse();
 
   if (candidates.length === 0) {
-    throw new Error("No local Playwright Chromium executable was found.");
+    throw new Error("No local Playwright Chromium executable was found. Run `npx playwright install chromium` and try again.");
   }
 
   return candidates[0];
@@ -34,6 +51,7 @@ function startMockTranslationServer() {
     ["/docs-interactions", "docs-interactions.html"],
     ["/social-feed", "social-feed.html"],
     ["/social-nested-feed", "social-nested-feed.html"],
+    ["/x-post-detail", "x-post-detail.html"],
     ["/search?q=antigravity", "google-serp.html"],
     ["/search?q=wireless+headphones&tbm=shop", "google-shopping.html"],
     ["/r/vibecoding/", "reddit-listing.html"],
@@ -361,6 +379,35 @@ test("keeps nested quote cards translated as separate blocks without touching ac
       page.locator("#inner-quote + [data-bilingual-translator-owned='true'], #inner-quote [data-bilingual-translator-owned='true']").first()
     ).toContainText("中文翻译");
     await expect(page.locator("#social-post footer [data-bilingual-translator-owned='true']")).toHaveCount(0);
+  } finally {
+    await context.close();
+    await mockServer.close();
+  }
+});
+
+test("translates X-style tweet bodies and quoted posts without touching page chrome", async () => {
+  const mockServer = await startMockTranslationServer();
+  const userDataDir = test.info().outputPath("x-post-detail-user-data");
+  const { context, background } = await launchExtensionContext(userDataDir);
+
+  try {
+    await configureMockTranslator(background, `${mockServer.origin}/v1/chat/completions`);
+
+    const page = await context.newPage();
+    await page.goto(buildFixtureUrl(mockServer.port, "/x-post-detail"));
+    await page.bringToFront();
+    const [tab] = await background.evaluate(async () => chrome.tabs.query({ active: true, currentWindow: true }));
+
+    await injectAndActivate(background, tab.id);
+
+    await expect(page.locator("[data-testid='tweetText'] + [data-bilingual-translator-owned='true']")).toHaveCount(3);
+    await expect(page.locator("[data-testid='tweetText'] + [data-bilingual-translator-owned='true']").first()).toContainText(
+      "中文翻译"
+    );
+    await expect(page.locator("header [data-bilingual-translator-owned='true']")).toHaveCount(0);
+    await expect(page.locator("nav [data-bilingual-translator-owned='true']")).toHaveCount(0);
+    await expect(page.locator("aside [data-bilingual-translator-owned='true']")).toHaveCount(0);
+    await expect(page.locator("[role='group'] [data-bilingual-translator-owned='true']")).toHaveCount(0);
   } finally {
     await context.close();
     await mockServer.close();

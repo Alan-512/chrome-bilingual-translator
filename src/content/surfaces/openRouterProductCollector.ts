@@ -1,4 +1,5 @@
-import type { CandidateBlock } from "../candidateDetector";
+import type { CandidateBlock } from "../candidateTypes";
+import { normalizeText } from "../core/textUtils";
 import type { PageClassification } from "../pageClassifier";
 
 const OPENROUTER_ALLOWED_ROOT_SELECTOR = [
@@ -11,10 +12,6 @@ const OPENROUTER_ALLOWED_ROOT_SELECTOR = [
 type OpenRouterAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
 };
-
-function normalizeText(text: string) {
-  return text.replace(/\s+/g, " ").trim();
-}
 
 function extractVisibleTitleText(element: HTMLElement): string {
   const childSpans = Array.from(element.querySelectorAll<HTMLElement>("span"));
@@ -36,7 +33,7 @@ function resolveExpansionRoot(root: HTMLElement): HTMLElement {
   return root.closest<HTMLElement>("li[style*='translateY']") ?? root.closest<HTMLElement>("li") ?? root;
 }
 
-export function collectOpenRouterCandidateBlock(
+export function collectOpenRouterProductCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
   helpers: OpenRouterAdapterHelpers
@@ -74,7 +71,7 @@ export function collectOpenRouterCandidateBlock(
     };
   }
 
-  const sourceText = element.textContent?.replace(/\s+/g, " ").trim() ?? "";
+  const sourceText = normalizeText(element.textContent);
   if (!sourceText) {
     return null;
   }

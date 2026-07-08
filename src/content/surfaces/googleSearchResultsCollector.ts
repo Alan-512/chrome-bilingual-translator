@@ -1,4 +1,5 @@
-import type { CandidateBlock } from "../candidateDetector";
+import type { CandidateBlock } from "../candidateTypes";
+import { normalizeText } from "../core/textUtils";
 import type { PageClassification } from "../pageClassifier";
 
 const GOOGLE_RESULT_ROOT_SELECTOR = ".MjjYud, .g, [data-snc], .related-question-pair, .kp-wholepage, [data-shopping-result]";
@@ -14,10 +15,6 @@ const GOOGLE_SHOPPING_TITLE_SELECTOR = "[data-shopping-result] [role='heading'],
 type GoogleSearchAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
 };
-
-function normalizeText(text: string) {
-  return text.replace(/\s+/g, " ").trim();
-}
 
 function getResultIndex(resultRoot: HTMLElement, selector = GOOGLE_RESULT_ROOT_SELECTOR) {
   const parent = resultRoot.parentElement;
@@ -82,7 +79,7 @@ function getKindIndex(resultRoot: HTMLElement, blockKind: string) {
   return getResultIndex(resultRoot, ".MjjYud, .g, [data-snc]");
 }
 
-export function collectGoogleSearchCandidateBlock(
+export function collectGoogleSearchResultsCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
   helpers: GoogleSearchAdapterHelpers
@@ -96,7 +93,7 @@ export function collectGoogleSearchCandidateBlock(
     return null;
   }
 
-  const sourceText = element.textContent?.replace(/\s+/g, " ").trim() ?? "";
+  const sourceText = normalizeText(element.textContent);
   if (!sourceText) {
     return null;
   }

@@ -1,4 +1,5 @@
 import { classifyPage } from "./pageClassifier";
+import { normalizeText } from "./core/textUtils";
 
 type RenderTranslationInput = {
   blockId: string;
@@ -570,10 +571,6 @@ function updateVirtualizedListLayout(expansionRoot?: HTMLElement): void {
   const targetListHeight = listBaseHeight + accumulatedExtraHeight;
   list.setAttribute("data-bilingual-translator-applied-height", String(targetListHeight));
   list.style.height = `${targetListHeight}px`;
-}
-
-function normalizeText(text: string | null | undefined): string {
-  return text?.replace(/\s+/g, " ").trim() ?? "";
 }
 
 function resolveLiveSourceElement(

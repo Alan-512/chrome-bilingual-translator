@@ -1,15 +1,23 @@
-import type { CandidateBlock } from "../candidateDetector";
+import type { CandidateBlock } from "../candidateTypes";
+import { normalizeText } from "../core/textUtils";
 import type { PageClassification } from "../pageClassifier";
-
-const REDDIT_FEED_CARD_SELECTOR = "shreddit-post";
-const REDUNDANT_CONTAINER_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
+import {
+  REDDIT_COMMENT_ANCHOR_SELECTOR,
+  REDDIT_COMMENT_BODY_SELECTOR,
+  REDDIT_COMMENT_ROOT_SELECTOR,
+  REDDIT_FEED_CARD_SELECTOR,
+  REDDIT_LISTING_BODY_CONTAINER_SELECTOR,
+  REDDIT_LISTING_TITLE_CONTAINER_SELECTOR,
+  REDDIT_LISTING_TITLE_TEXT_SELECTOR,
+  REDDIT_SEMANTIC_BLOCK_SELECTOR
+} from "../siteProfiles/redditProfile";
 
 type RedditAdapterHelpers = {
   getStableBlockId: (element: HTMLElement) => string;
 };
 
 function getNormalizedText(element: HTMLElement | null): string {
-  return element?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+  return normalizeText(element?.textContent);
 }
 
 function getNormalizedGroupedText(element: HTMLElement | null): string {
@@ -17,7 +25,7 @@ function getNormalizedGroupedText(element: HTMLElement | null): string {
     return "";
   }
 
-  const semanticChildren = Array.from(element.querySelectorAll<HTMLElement>(REDUNDANT_CONTAINER_SELECTOR))
+  const semanticChildren = Array.from(element.querySelectorAll<HTMLElement>(REDDIT_SEMANTIC_BLOCK_SELECTOR))
     .map((child) => getNormalizedText(child))
     .filter(Boolean);
 
@@ -29,7 +37,7 @@ function getNormalizedGroupedText(element: HTMLElement | null): string {
 }
 
 function normalizePart(part: string) {
-  return part.replace(/\s+/g, " ").trim();
+  return normalizeText(part);
 }
 
 function buildRedditRehydrateKey(page: PageClassification, parts: string[]) {
@@ -43,37 +51,37 @@ function getBodyBlockIndex(bodyElement: HTMLElement, element: HTMLElement) {
 }
 
 function getDetailBodyBlocks(bodyElement: HTMLElement): HTMLElement[] {
-  const semanticBlocks = Array.from(bodyElement.querySelectorAll<HTMLElement>(REDUNDANT_CONTAINER_SELECTOR));
+  const semanticBlocks = Array.from(bodyElement.querySelectorAll<HTMLElement>(REDDIT_SEMANTIC_BLOCK_SELECTOR));
 
   return semanticBlocks.filter((block) => {
-    const semanticAncestor = block.parentElement?.closest<HTMLElement>(REDUNDANT_CONTAINER_SELECTOR);
+    const semanticAncestor = block.parentElement?.closest<HTMLElement>(REDDIT_SEMANTIC_BLOCK_SELECTOR);
     return semanticAncestor == null || !bodyElement.contains(semanticAncestor);
   });
 }
 
 function getListingTitleContainer(feedCard: HTMLElement): HTMLElement | null {
-  return feedCard.querySelector<HTMLElement>("[slot='title'], [data-post-click-location='title']");
+  return feedCard.querySelector<HTMLElement>(REDDIT_LISTING_TITLE_CONTAINER_SELECTOR);
 }
 
 function getListingTitleTextElement(feedCard: HTMLElement): HTMLElement | null {
   const titleContainer = getListingTitleContainer(feedCard);
-  return titleContainer?.querySelector<HTMLElement>("h1, h2, h3, h4, h5, h6") ?? titleContainer;
+  return titleContainer?.querySelector<HTMLElement>(REDDIT_LISTING_TITLE_TEXT_SELECTOR) ?? titleContainer;
 }
 
 function getListingBodyContainer(feedCard: HTMLElement): HTMLElement | null {
-  return feedCard.querySelector<HTMLElement>("[slot='text-body'], [data-post-click-location='text-body'], .md.feed-card-text-preview");
+  return feedCard.querySelector<HTMLElement>(REDDIT_LISTING_BODY_CONTAINER_SELECTOR);
 }
 
 function getCommentBody(element: HTMLElement): {
   commentRoot: HTMLElement;
   commentBody: HTMLElement;
 } | null {
-  const commentRoot = element.closest<HTMLElement>("shreddit-comment");
+  const commentRoot = element.closest<HTMLElement>(REDDIT_COMMENT_ROOT_SELECTOR);
   if (!commentRoot) {
     return null;
   }
 
-  const commentBody = commentRoot.querySelector<HTMLElement>("[slot='comment'], .md[slot='comment']");
+  const commentBody = commentRoot.querySelector<HTMLElement>(REDDIT_COMMENT_BODY_SELECTOR);
   if (!commentBody) {
     return null;
   }
@@ -85,11 +93,11 @@ function getCommentBody(element: HTMLElement): {
 }
 
 function getCommentAnchorElement(commentBody: HTMLElement): HTMLElement {
-  const semanticBlocks = Array.from(commentBody.querySelectorAll<HTMLElement>("p, li, blockquote"));
+  const semanticBlocks = Array.from(commentBody.querySelectorAll<HTMLElement>(REDDIT_COMMENT_ANCHOR_SELECTOR));
   return semanticBlocks.at(-1) ?? commentBody;
 }
 
-export function collectRedditCandidateBlock(
+export function collectRedditSocialFeedCandidateBlock(
   element: HTMLElement,
   page: PageClassification,
   helpers: RedditAdapterHelpers
