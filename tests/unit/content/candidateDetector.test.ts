@@ -215,12 +215,18 @@ describe("collectCandidateBlocks", () => {
     expect(blocks[0]?.rehydrateKey).toBe("reddit|listing|card-title|A Reddit feed title that should be translated");
     expect(blocks[0]?.renderHint?.anchorElement).toBe(feedTitle);
     expect(blocks[0]?.renderHint?.expansionRoot).toBe(feedCard);
+    expect(blocks[0]?.renderHint?.skipLoadingPlaceholder).not.toBe(true);
+    expect(blocks[0]?.renderHint?.skipVirtualizedLayoutAdjustment).toBe(true);
+    expect(blocks[0]?.renderHint?.preserveExistingRenderedCopies).toBe(true);
 
     expect(blocks[1]?.element).toBe(feedBody);
     expect(blocks[1]?.sourceText).toBe("A feed preview paragraph that is shown on the homepage card.");
     expect(blocks[1]?.rehydrateKey).toBe("reddit|listing|card-body|A feed preview paragraph that is shown on the homepage card.");
     expect(blocks[1]?.renderHint?.anchorElement).toBe(feedBody);
     expect(blocks[1]?.renderHint?.expansionRoot).toBe(feedCard);
+    expect(blocks[1]?.renderHint?.skipLoadingPlaceholder).not.toBe(true);
+    expect(blocks[1]?.renderHint?.skipVirtualizedLayoutAdjustment).toBe(true);
+    expect(blocks[1]?.renderHint?.preserveExistingRenderedCopies).toBe(true);
   });
 
   it("collects X tweet bodies without translating surrounding action chrome", () => {
@@ -260,6 +266,10 @@ describe("collectCandidateBlocks", () => {
     expect(blocks.some((block) => block.sourceText === "Post")).toBe(false);
     expect(blocks.some((block) => block.sourceText.includes("Reply"))).toBe(false);
     expect(blocks.every((block) => block.rehydrateKey?.startsWith("social-feed|x|"))).toBe(true);
+    expect(blocks.every((block) => block.renderHint?.skipLoadingPlaceholder !== true)).toBe(true);
+    expect(blocks.every((block) => block.renderHint?.skipVirtualizedLayoutAdjustment)).toBe(true);
+    expect(blocks.every((block) => block.renderHint?.preserveExistingRenderedCopies)).toBe(true);
+    expect(blocks.every((block) => block.renderHint?.renderAsSourceInline)).toBe(true);
   });
 
   it("keeps Reddit listing title separate while grouping semantic body children into one body block", () => {

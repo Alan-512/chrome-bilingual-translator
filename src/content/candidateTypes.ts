@@ -7,6 +7,9 @@ export type CandidateBlock = {
     anchorElement?: HTMLElement;
     expansionRoot?: HTMLElement;
     skipLoadingPlaceholder?: boolean;
+    skipVirtualizedLayoutAdjustment?: boolean;
+    preserveExistingRenderedCopies?: boolean;
+    renderAsSourceInline?: boolean;
   };
 };
 

@@ -1,5 +1,6 @@
 type ObserverCoordinatorCallbacks = {
   onVisible: (elements: HTMLElement[]) => void;
+  onVisibleSettled?: (elements: HTMLElement[]) => void;
   onMutation: () => void;
 };
 
@@ -16,7 +17,9 @@ export function createObserverCoordinator(
   dependencies: ObserverCoordinatorDependencies = {}
 ) {
   let mutationFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  let visibleFlushTimer: ReturnType<typeof setTimeout> | null = null;
   let lastScrollAt = 0;
+  const pendingVisibleElements = new Set<HTMLElement>();
 
   const clearTimeoutFn = doc.defaultView?.clearTimeout?.bind(doc.defaultView) ?? clearTimeout;
   const setTimeoutFn = doc.defaultView?.setTimeout?.bind(doc.defaultView) ?? setTimeout;
@@ -26,6 +29,42 @@ export function createObserverCoordinator(
       clearTimeoutFn(mutationFlushTimer);
       mutationFlushTimer = null;
     }
+  }
+
+  function clearVisibleFlushTimer() {
+    if (visibleFlushTimer !== null) {
+      clearTimeoutFn(visibleFlushTimer);
+      visibleFlushTimer = null;
+    }
+  }
+
+  function flushVisibleElements() {
+    clearVisibleFlushTimer();
+
+    if (pendingVisibleElements.size === 0) {
+      return;
+    }
+
+    const visibleElements = Array.from(pendingVisibleElements);
+    pendingVisibleElements.clear();
+    (callbacks?.onVisibleSettled ?? callbacks?.onVisible)?.(visibleElements);
+  }
+
+  function scheduleVisibleFlush() {
+    clearVisibleFlushTimer();
+
+    const now = Date.now();
+    const scrollCooldown = Math.max(0, SCROLL_SETTLE_DEBOUNCE_MS - (now - lastScrollAt));
+
+    if (scrollCooldown === 0) {
+      flushVisibleElements();
+      return;
+    }
+
+    visibleFlushTimer = setTimeoutFn(() => {
+      visibleFlushTimer = null;
+      flushVisibleElements();
+    }, scrollCooldown);
   }
 
   function scheduleMutationFlush() {
@@ -44,6 +83,10 @@ export function createObserverCoordinator(
     lastScrollAt = Date.now();
     if (mutationFlushTimer !== null) {
       scheduleMutationFlush();
+    }
+
+    if (visibleFlushTimer !== null || pendingVisibleElements.size > 0) {
+      scheduleVisibleFlush();
     }
   }
 
@@ -106,6 +149,10 @@ export function createObserverCoordinator(
 
     if (visibleElements.length > 0) {
       callbacks?.onVisible(visibleElements);
+      if (callbacks?.onVisibleSettled) {
+        visibleElements.forEach((element) => pendingVisibleElements.add(element));
+        scheduleVisibleFlush();
+      }
     }
   });
 
@@ -144,6 +191,8 @@ export function createObserverCoordinator(
 
     disconnect() {
       clearMutationFlushTimer();
+      clearVisibleFlushTimer();
+      pendingVisibleElements.clear();
       callbacks = null;
       doc.defaultView?.removeEventListener("scroll", handleScroll);
       intersectionObserver.disconnect();

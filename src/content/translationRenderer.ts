@@ -8,6 +8,8 @@ type RenderTranslationInput = {
   tightLayout?: boolean;
   anchorElement?: HTMLElement;
   expansionRoot?: HTMLElement;
+  skipVirtualizedLayoutAdjustment?: boolean;
+  renderAsSourceInline?: boolean;
 };
 
 type RenderTranslationLoadingInput = {
@@ -15,6 +17,8 @@ type RenderTranslationLoadingInput = {
   tightLayout?: boolean;
   anchorElement?: HTMLElement;
   expansionRoot?: HTMLElement;
+  skipVirtualizedLayoutAdjustment?: boolean;
+  renderAsSourceInline?: boolean;
 };
 
 const OWNED_ATTRIBUTE = "data-bilingual-translator-owned";
@@ -22,6 +26,10 @@ const BLOCK_ID_ATTRIBUTE = "data-bilingual-translator-block-id";
 const STATE_ATTRIBUTE = "data-bilingual-translator-state";
 const STYLE_ATTRIBUTE = "data-bilingual-translator-style";
 const SOURCE_ID_ATTRIBUTE = "data-bilingual-translator-source-id";
+const INLINE_TRANSLATION_ATTRIBUTE = "data-bilingual-translator-inline";
+const INLINE_TRANSLATION_TEXT_ATTRIBUTE = "data-bilingual-translator-inline-text";
+const INLINE_TRANSLATION_STATE_ATTRIBUTE = "data-bilingual-translator-inline-state";
+const INLINE_TRANSLATION_BLOCK_ID_ATTRIBUTE = "data-bilingual-translator-inline-block-id";
 const FALLBACK_SOURCE_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6, [slot='title'], [slot='text-body']";
 const EXPANDED_ATTRIBUTE = "data-bilingual-translator-expanded";
 const VIRTUAL_ROW_BASE_HEIGHT_ATTRIBUTE = "data-bilingual-translator-base-height";
@@ -97,20 +105,74 @@ function ensureTranslationStyles(doc: Document): void {
       display: flex;
       align-items: center;
       gap: 8px;
+      min-height: 1.45em;
       width: fit-content;
       max-width: 100%;
       color: inherit;
       opacity: 0.82;
+      contain: paint;
     }
 
     .bilingual-translator-spinner {
       width: 12px;
       height: 12px;
-      border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
-      border-top-color: currentColor;
       border-radius: 999px;
-      animation: bilingual-translator-spin 0.85s linear infinite;
+      background: conic-gradient(currentColor 0deg 95deg, transparent 95deg 360deg);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+      box-sizing: border-box;
+      transform-origin: 50% 50%;
+      will-change: transform;
+      animation: bilingual-translator-spin 0.9s linear infinite;
       flex: none;
+    }
+
+    [data-bilingual-translator-inline="true"] {
+      position: relative;
+    }
+
+    [data-bilingual-translator-inline="true"]::after {
+      content: attr(data-bilingual-translator-inline-text);
+      display: block;
+      margin-top: 8px;
+      color: inherit;
+      font-size: 0.9em;
+      line-height: 1.45;
+      unicode-bidi: plaintext;
+      writing-mode: horizontal-tb;
+      text-orientation: mixed;
+      text-align: start;
+      text-decoration-line: underline;
+      text-decoration-style: dashed;
+      text-decoration-color: color-mix(in srgb, currentColor 64%, transparent);
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+      padding-bottom: 2px;
+    }
+
+    [data-bilingual-translator-inline="true"][data-bilingual-translator-inline-state="loading"]::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 0.33em;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: conic-gradient(currentColor 0deg 95deg, transparent 95deg 360deg);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+      transform-origin: 50% 50%;
+      will-change: transform;
+      animation: bilingual-translator-spin 0.9s linear infinite;
+      pointer-events: none;
+    }
+
+    [data-bilingual-translator-inline="true"][data-bilingual-translator-inline-state="loading"]::after {
+      content: "Translating...";
+      min-height: 1.45em;
+      padding-left: 20px;
+      opacity: 0.82;
+      text-decoration-line: none;
     }
 
     h1 .bilingual-translator-translation,
@@ -309,6 +371,44 @@ function getOrCreateTranslationElement(
   }
 
   return translationElement;
+}
+
+function getInlineSourceElement(sourceElement: HTMLElement, explicitAnchorElement?: HTMLElement): HTMLElement {
+  return getTranslationAnchorElement(sourceElement, explicitAnchorElement);
+}
+
+function clearInlineSourceTranslation(element: HTMLElement): void {
+  element.removeAttribute(INLINE_TRANSLATION_ATTRIBUTE);
+  element.removeAttribute(INLINE_TRANSLATION_TEXT_ATTRIBUTE);
+  element.removeAttribute(INLINE_TRANSLATION_STATE_ATTRIBUTE);
+  element.removeAttribute(INLINE_TRANSLATION_BLOCK_ID_ATTRIBUTE);
+}
+
+function renderInlineSourceTranslation(
+  sourceElement: HTMLElement,
+  input: RenderTranslationInput | RenderTranslationLoadingInput,
+  state: "loading" | "translated",
+  translationText: string
+): HTMLElement {
+  ensureTranslationStyles(sourceElement.ownerDocument);
+  const inlineSourceElement = getInlineSourceElement(sourceElement, input.anchorElement);
+
+  inlineSourceElement
+    .ownerDocument
+    .querySelectorAll<HTMLElement>(`[${OWNED_ATTRIBUTE}='true'][${BLOCK_ID_ATTRIBUTE}='${input.blockId}']`)
+    .forEach((element) => element.remove());
+
+  inlineSourceElement.setAttribute(INLINE_TRANSLATION_ATTRIBUTE, "true");
+  inlineSourceElement.setAttribute(INLINE_TRANSLATION_BLOCK_ID_ATTRIBUTE, input.blockId);
+  inlineSourceElement.setAttribute(INLINE_TRANSLATION_STATE_ATTRIBUTE, state);
+
+  if (state === "translated") {
+    inlineSourceElement.setAttribute(INLINE_TRANSLATION_TEXT_ATTRIBUTE, translationText);
+  } else {
+    inlineSourceElement.setAttribute(INLINE_TRANSLATION_TEXT_ATTRIBUTE, "Translating...");
+  }
+
+  return inlineSourceElement;
 }
 
 function relaxClippedAncestors(sourceElement: HTMLElement, expansionRoot?: HTMLElement): void {
@@ -618,6 +718,10 @@ export function renderTranslationLoadingBelow(
   sourceElement: HTMLElement,
   input: RenderTranslationLoadingInput
 ): HTMLElement {
+  if (input.renderAsSourceInline) {
+    return renderInlineSourceTranslation(sourceElement, input, "loading", "Translating...");
+  }
+
   relaxClippedAncestors(sourceElement, input.expansionRoot);
   const translationElement = getOrCreateTranslationElement(sourceElement, input.blockId, input.anchorElement);
   translationElement.setAttribute(STATE_ATTRIBUTE, "loading");
@@ -638,12 +742,18 @@ export function renderTranslationLoadingBelow(
     delete translationElement.dataset.bilingualTranslatorLayout;
   }
 
-  updateVirtualizedListLayout(input.expansionRoot);
+  if (!input.skipVirtualizedLayoutAdjustment) {
+    updateVirtualizedListLayout(input.expansionRoot);
+  }
   return translationElement;
 }
 
 export function renderTranslationBelow(sourceElement: HTMLElement, input: RenderTranslationInput): HTMLElement {
   const liveSourceElement = resolveLiveSourceElement(sourceElement, input.blockId, input.sourceText);
+  if (input.renderAsSourceInline) {
+    return renderInlineSourceTranslation(liveSourceElement, input, "translated", input.translationText);
+  }
+
   relaxClippedAncestors(liveSourceElement, input.expansionRoot);
   const translationElement = getOrCreateTranslationElement(liveSourceElement, input.blockId, input.anchorElement);
   translationElement.setAttribute(STATE_ATTRIBUTE, "translated");
@@ -655,13 +765,18 @@ export function renderTranslationBelow(sourceElement: HTMLElement, input: Render
     delete translationElement.dataset.bilingualTranslatorLayout;
   }
 
-  updateVirtualizedListLayout(input.expansionRoot);
+  if (!input.skipVirtualizedLayoutAdjustment) {
+    updateVirtualizedListLayout(input.expansionRoot);
+  }
   return translationElement;
 }
 
 export function removeRenderedTranslations(root: ParentNode): void {
   root.querySelectorAll<HTMLElement>(`[${OWNED_ATTRIBUTE}='true']`).forEach((element) => {
     element.remove();
+  });
+  root.querySelectorAll<HTMLElement>(`[${INLINE_TRANSLATION_ATTRIBUTE}='true']`).forEach((element) => {
+    clearInlineSourceTranslation(element);
   });
 }
 
@@ -670,5 +785,10 @@ export function removeRenderedTranslationBlock(root: ParentNode, blockId: string
     .querySelectorAll<HTMLElement>(`[${OWNED_ATTRIBUTE}='true'][${BLOCK_ID_ATTRIBUTE}='${blockId}']`)
     .forEach((element) => {
       element.remove();
+    });
+  root
+    .querySelectorAll<HTMLElement>(`[${INLINE_TRANSLATION_ATTRIBUTE}='true'][${INLINE_TRANSLATION_BLOCK_ID_ATTRIBUTE}='${blockId}']`)
+    .forEach((element) => {
+      clearInlineSourceTranslation(element);
     });
 }

@@ -103,7 +103,10 @@ export function collectSocialFeedSurfaceCandidateBlock(
     rehydrateKey: `social-feed|x|${page.surface}|${statusId}|body|${bodyIndex}|${normalizeTextForKey(sourceText)}`,
     renderHint: {
       anchorElement: element,
-      expansionRoot: postRoot
+      expansionRoot: postRoot,
+      skipVirtualizedLayoutAdjustment: true,
+      preserveExistingRenderedCopies: true,
+      renderAsSourceInline: true
     }
   };
 }

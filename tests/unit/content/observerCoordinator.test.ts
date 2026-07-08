@@ -284,4 +284,50 @@ describe("observerCoordinator", () => {
     expect(onMutation).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
+
+  it("forwards visible elements immediately and sends a settled signal after scrolling stops", async () => {
+    vi.useFakeTimers();
+    let intersectionCallback: IntersectionObserverCallback | undefined;
+
+    const coordinator = createObserverCoordinator(document, {
+      createIntersectionObserver(callback) {
+        intersectionCallback = callback;
+        return {
+          observe: vi.fn(),
+          disconnect: vi.fn()
+        } as unknown as IntersectionObserver;
+      },
+      createMutationObserver() {
+        return {
+          observe: vi.fn(),
+          disconnect: vi.fn()
+        } as unknown as MutationObserver;
+      }
+    });
+
+    const onVisible = vi.fn();
+    const onVisibleSettled = vi.fn();
+    coordinator.start([], {
+      onVisible,
+      onVisibleSettled,
+      onMutation: vi.fn()
+    });
+
+    const target = document.createElement("p");
+    window.dispatchEvent(new Event("scroll"));
+    intersectionCallback?.([{ isIntersecting: true, target }] as IntersectionObserverEntry[], {} as IntersectionObserver);
+
+    expect(onVisible).toHaveBeenCalledWith([target]);
+
+    await vi.advanceTimersByTimeAsync(120);
+    expect(onVisibleSettled).toHaveBeenCalledTimes(0);
+
+    window.dispatchEvent(new Event("scroll"));
+    await vi.advanceTimersByTimeAsync(120);
+    expect(onVisibleSettled).toHaveBeenCalledTimes(0);
+
+    await vi.advanceTimersByTimeAsync(80);
+    expect(onVisibleSettled).toHaveBeenCalledWith([target]);
+    vi.useRealTimers();
+  });
 });

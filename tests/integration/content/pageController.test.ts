@@ -81,7 +81,7 @@ describe("pageController", () => {
   });
 
   it("translates newly visible blocks lazily through the observer callback", async () => {
-    let visibleCallback: ((elements: HTMLElement[]) => void) | undefined;
+    let visibleSettledCallback: ((elements: HTMLElement[]) => void) | undefined;
     const requestTranslations = vi.fn(async (blocks) =>
       Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
     );
@@ -92,7 +92,7 @@ describe("pageController", () => {
       isElementReadyForTranslation: (element) => element.tagName === "H2",
       createObserverCoordinator: () => ({
         start(_candidates, callbacks) {
-          visibleCallback = callbacks.onVisible;
+          visibleSettledCallback = callbacks.onVisibleSettled;
         },
         observeCandidates() {},
         disconnect() {}
@@ -105,7 +105,7 @@ describe("pageController", () => {
     expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(1);
 
     const paragraph = document.querySelector("p") as HTMLElement;
-    visibleCallback?.([paragraph]);
+    visibleSettledCallback?.([paragraph]);
 
     await settlePromises();
 
@@ -115,7 +115,7 @@ describe("pageController", () => {
   });
 
   it("uses viewport proximity as the default initial translation gate", async () => {
-    let visibleCallback: ((elements: HTMLElement[]) => void) | undefined;
+    let visibleSettledCallback: ((elements: HTMLElement[]) => void) | undefined;
     const requestTranslations = vi.fn(async (blocks) =>
       Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
     );
@@ -129,7 +129,7 @@ describe("pageController", () => {
       reportPageState: async () => {},
       createObserverCoordinator: () => ({
         start(_candidates, callbacks) {
-          visibleCallback = callbacks.onVisible;
+          visibleSettledCallback = callbacks.onVisibleSettled;
         },
         observeCandidates() {},
         disconnect() {}
@@ -142,7 +142,7 @@ describe("pageController", () => {
     expect(requestTranslations.mock.calls[0]?.[0]).toHaveLength(1);
     expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(1);
 
-    visibleCallback?.([paragraph]);
+    visibleSettledCallback?.([paragraph]);
     await settlePromises();
 
     expect(requestTranslations).toHaveBeenCalledTimes(2);
@@ -311,7 +311,7 @@ describe("pageController", () => {
 
   it("observes dynamically added content without translating it until it becomes visible", async () => {
     let mutationCallback: (() => void) | undefined;
-    let visibleCallback: ((elements: HTMLElement[]) => void) | undefined;
+    let visibleSettledCallback: ((elements: HTMLElement[]) => void) | undefined;
     const observedElements: HTMLElement[] = [];
     const requestTranslations = vi.fn(async (blocks) =>
       Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
@@ -322,7 +322,7 @@ describe("pageController", () => {
       reportPageState: async () => {},
       createObserverCoordinator: () => ({
         start(_candidates, callbacks) {
-          visibleCallback = callbacks.onVisible;
+          visibleSettledCallback = callbacks.onVisibleSettled;
           mutationCallback = callbacks.onMutation;
         },
         observeCandidates(candidates) {
@@ -348,7 +348,7 @@ describe("pageController", () => {
     expect(observedElements).toContain(newParagraph);
     expect(requestTranslations).toHaveBeenCalledTimes(1);
 
-    visibleCallback?.([newParagraph]);
+    visibleSettledCallback?.([newParagraph]);
     await settlePromises();
 
     expect(requestTranslations).toHaveBeenCalledTimes(2);
@@ -600,6 +600,111 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("keeps parallel social feed translations when duplicated host nodes share the same memory key", async () => {
+    let mutationCallback: (() => void) | undefined;
+    const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    window.history.replaceState({}, "", "/home");
+    document.body.innerHTML = `
+      <main>
+        <article data-testid="tweet">
+          <a href="/gdb/status/1234567890"><time>2h</time></a>
+          <div data-testid="tweetText" lang="en">A duplicated social post that can overlap during virtualization.</div>
+        </article>
+      </main>
+    `;
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          mutationCallback = callbacks.onMutation;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    await controller.activate();
+
+    document.querySelector("main")?.insertAdjacentHTML(
+      "beforeend",
+      `
+        <article data-testid="tweet">
+          <a href="/gdb/status/1234567890"><time>2h</time></a>
+          <div data-testid="tweetText" lang="en">A duplicated social post that can overlap during virtualization.</div>
+        </article>
+      `
+    );
+
+    mutationCallback?.();
+    await settlePromises();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(requestTranslations.mock.calls[0]?.[0]).toEqual([
+      expect.objectContaining({ sourceText: "A duplicated social post that can overlap during virtualization." })
+    ]);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-testid='tweetText'][data-bilingual-translator-inline='true']")).toHaveLength(2);
+    expect(
+      Array.from(document.querySelectorAll("[data-testid='tweetText'][data-bilingual-translator-inline='true']")).every((node) =>
+        node.getAttribute("data-bilingual-translator-inline-text")?.includes("ZH:A duplicated social post")
+      )
+    ).toBe(true);
+    await controller.deactivate();
+  });
+
+  it("rehydrates cached visible translations immediately but waits for settled visibility before requesting new text", async () => {
+    let visibleCallback: ((elements: HTMLElement[]) => void) | undefined;
+    let visibleSettledCallback: ((elements: HTMLElement[]) => void) | undefined;
+    const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          visibleCallback = callbacks.onVisible;
+          visibleSettledCallback = callbacks.onVisibleSettled;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    await controller.activate();
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+
+    document.querySelectorAll("[data-bilingual-translator-owned='true']").forEach((node) => node.remove());
+    const cachedParagraph = document.querySelector("p") as HTMLElement;
+    const newParagraph = document.createElement("p");
+    newParagraph.textContent = "A never-before-seen paragraph that should wait until scroll settles.";
+    document.querySelector("main")?.appendChild(newParagraph);
+
+    visibleCallback?.([cachedParagraph, newParagraph]);
+    await settlePromises();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).toContain("ZH:Hello world from a real content paragraph.");
+    expect(document.body.textContent).not.toContain("ZH:A never-before-seen paragraph");
+
+    visibleSettledCallback?.([newParagraph]);
+    await settlePromises();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(2);
+    expect(requestTranslations.mock.calls[1]?.[0]).toEqual([
+      expect.objectContaining({
+        sourceText: "A never-before-seen paragraph that should wait until scroll settles."
+      })
+    ]);
+    await controller.deactivate();
+  });
+
   it("does not queue the same visible content twice while its first request is still pending", async () => {
     let mutationCallback: (() => void) | undefined;
     let resolveTranslations: ((value: Record<string, string>) => void) | undefined;
@@ -688,7 +793,7 @@ describe("pageController", () => {
   });
 
   it("starts translating newly visible blocks even while an earlier request is still pending", async () => {
-    let visibleCallback: ((elements: HTMLElement[]) => void) | undefined;
+    let visibleSettledCallback: ((elements: HTMLElement[]) => void) | undefined;
     const heading = document.querySelector("h2") as HTMLElement;
     const paragraph = document.querySelector("p") as HTMLElement;
     let resolveFirstBatch: ((value: Record<string, string>) => void) | undefined;
@@ -715,7 +820,7 @@ describe("pageController", () => {
       isElementReadyForTranslation: (element) => element === heading,
       createObserverCoordinator: () => ({
         start(_candidates, callbacks) {
-          visibleCallback = callbacks.onVisible;
+          visibleSettledCallback = callbacks.onVisibleSettled;
         },
         observeCandidates() {},
         disconnect() {}
@@ -728,7 +833,7 @@ describe("pageController", () => {
     expect(requestTranslations).toHaveBeenCalledTimes(1);
     expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(1);
 
-    visibleCallback?.([paragraph]);
+    visibleSettledCallback?.([paragraph]);
     await settlePromises();
 
     expect(requestTranslations).toHaveBeenCalledTimes(2);
@@ -929,7 +1034,7 @@ describe("pageController", () => {
       Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
     );
     const observedGroups: HTMLElement[][] = [];
-    const visibleCallbacks: Array<(elements: HTMLElement[]) => void> = [];
+    const visibleSettledCallbacks: Array<(elements: HTMLElement[]) => void> = [];
 
     window.history.replaceState({}, "", "/r/vibecoding/");
     document.body.innerHTML = `
@@ -948,7 +1053,9 @@ describe("pageController", () => {
       createObserverCoordinator: () => ({
         start(candidates, callbacks) {
           observedGroups.push(candidates);
-          visibleCallbacks.push(callbacks.onVisible);
+          if (callbacks.onVisibleSettled) {
+            visibleSettledCallbacks.push(callbacks.onVisibleSettled);
+          }
         },
         observeCandidates() {},
         disconnect() {}
@@ -989,7 +1096,7 @@ describe("pageController", () => {
     ]);
 
     const detailParagraphs = Array.from(document.querySelectorAll("[slot='text-body'] p")) as HTMLElement[];
-    visibleCallbacks.at(-1)?.(detailParagraphs);
+    visibleSettledCallbacks.at(-1)?.(detailParagraphs);
     await settlePromises();
 
     expect(requestTranslations).toHaveBeenCalledTimes(3);

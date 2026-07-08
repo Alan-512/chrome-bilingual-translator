@@ -400,9 +400,10 @@ test("translates X-style tweet bodies and quoted posts without touching page chr
 
     await injectAndActivate(background, tab.id);
 
-    await expect(page.locator("[data-testid='tweetText'] + [data-bilingual-translator-owned='true']")).toHaveCount(3);
-    await expect(page.locator("[data-testid='tweetText'] + [data-bilingual-translator-owned='true']").first()).toContainText(
-      "中文翻译"
+    await expect(page.locator("[data-testid='tweetText'][data-bilingual-translator-inline='true']")).toHaveCount(3);
+    await expect(page.locator("[data-testid='tweetText'][data-bilingual-translator-inline='true']").first()).toHaveAttribute(
+      "data-bilingual-translator-inline-text",
+      /中文翻译/
     );
     await expect(page.locator("header [data-bilingual-translator-owned='true']")).toHaveCount(0);
     await expect(page.locator("nav [data-bilingual-translator-owned='true']")).toHaveCount(0);
@@ -429,18 +430,20 @@ test("retranslates an X-style tweet body when a virtualized node reuses the same
 
     await injectAndActivate(background, tab.id);
 
-    const primaryTweetTranslation = page.locator("#primary-tweet-text + [data-bilingual-translator-owned='true']");
-    await expect(primaryTweetTranslation).toContainText(
+    const primaryTweetTranslation = page.locator("#primary-tweet-text[data-bilingual-translator-inline='true']");
+    await expect(primaryTweetTranslation).toHaveAttribute(
+      "data-bilingual-translator-inline-text",
       "中文翻译：Closing this week. Much of the teams building ChatGPT, Codex and OpenClaw will be there."
     );
 
     await page.locator("#reuse-tweet-node").click();
 
-    await expect(primaryTweetTranslation).toContainText(
+    await expect(primaryTweetTranslation).toHaveAttribute(
+      "data-bilingual-translator-inline-text",
       "中文翻译：Updated text from a reused virtualized X post node."
     );
-    await expect(primaryTweetTranslation).not.toContainText("Closing this week");
-    await expect(page.locator("#primary-tweet-text + [data-bilingual-translator-owned='true']")).toHaveCount(1);
+    await expect(primaryTweetTranslation).not.toHaveAttribute("data-bilingual-translator-inline-text", /Closing this week/);
+    await expect(page.locator("#primary-tweet-text[data-bilingual-translator-inline='true']")).toHaveCount(1);
   } finally {
     await context.close();
     await mockServer.close();

@@ -73,7 +73,8 @@ describe("renderTranslationBelow", () => {
 
     const styleTag = document.head.querySelector("[data-bilingual-translator-style='true']");
     expect(styleTag?.textContent).toContain("color: inherit");
-    expect(styleTag?.textContent).toContain("border-top-color: currentColor");
+    expect(styleTag?.textContent).toContain("conic-gradient(currentColor");
+    expect(styleTag?.textContent).toContain("bilingual-translator-spin");
     expect(styleTag?.textContent).toContain("text-decoration-line: underline");
     expect(styleTag?.textContent).toContain("text-decoration-style: dashed");
     expect(styleTag?.textContent).not.toContain("border-bottom: 2px dashed");
@@ -494,5 +495,30 @@ describe("renderTranslationBelow", () => {
 
     // Check that row3 (positioned via matrix3d) preserved original parameters and was shifted correctly
     expect(row3.style.transform).toBe("matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 30, 370, 40, 1)");
+  });
+
+  it("can skip virtualized list transform rewrites for host-managed social feeds", () => {
+    document.body.innerHTML = `
+      <ul id="list" style="height: 500px;">
+        <li id="row1" style="position: absolute; transform: matrix(1, 0, 0, 1, 10, 100); height: 50px;">Row 1</li>
+        <li id="row2" style="position: absolute; translate: 20px 200px 30px; height: 50px;">Row 2</li>
+      </ul>
+    `;
+    const row1 = document.getElementById("row1") as HTMLLIElement;
+    const row2 = document.getElementById("row2") as HTMLLIElement;
+
+    Object.defineProperty(row1, "scrollHeight", { value: 80, configurable: true });
+
+    renderTranslationBelow(row1, {
+      blockId: "alpha",
+      translationText: "译文 1",
+      expansionRoot: row1,
+      skipVirtualizedLayoutAdjustment: true
+    });
+
+    expect(row1.style.transform).toBe("matrix(1, 0, 0, 1, 10, 100)");
+    expect(row1.style.height).toBe("50px");
+    expect(row2.style.translate).toBe("20px 200px 30px");
+    expect(document.getElementById("list")?.style.height).toBe("500px");
   });
 });

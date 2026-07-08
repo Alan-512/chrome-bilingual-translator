@@ -12,7 +12,14 @@ import { isExtensionContextInvalidatedError } from "./runtimeMessaging";
 import { normalizeText } from "./core/textUtils";
 
 type ObserverCoordinatorLike = {
-  start(candidates: HTMLElement[], callbacks: { onVisible: (elements: HTMLElement[]) => void; onMutation: () => void }): void;
+  start(
+    candidates: HTMLElement[],
+    callbacks: {
+      onVisible: (elements: HTMLElement[]) => void;
+      onVisibleSettled?: (elements: HTMLElement[]) => void;
+      onMutation: () => void;
+    }
+  ): void;
   observeCandidates(candidates: HTMLElement[]): void;
   disconnect(): void;
 };
@@ -37,6 +44,9 @@ type CandidateBlock = ReturnType<typeof collectCandidateBlocks>[number];
 type QueuedBatch = {
   candidates: CandidateBlock[];
   resolve: () => void;
+};
+type ProcessCandidatesOptions = {
+  allowRequests?: boolean;
 };
 
 function normalizeSourceText(text: string) {
@@ -179,6 +189,12 @@ export function createPageController(doc: Document, dependencies: PageController
 
   function removeStaleRenderedTranslationForMemoryKey(candidate: CandidateBlock) {
     const memoryKey = getCandidateMemoryKey(candidate);
+
+    if (candidate.renderHint?.preserveExistingRenderedCopies) {
+      renderedMemoryBlockIds.set(memoryKey, candidate.blockId);
+      return;
+    }
+
     const renderedBlockId = renderedMemoryBlockIds.get(memoryKey);
 
     if (renderedBlockId && renderedBlockId !== candidate.blockId) {
@@ -189,7 +205,10 @@ export function createPageController(doc: Document, dependencies: PageController
   }
 
   function hasRenderedTranslationBlock(blockId: string) {
-    return doc.querySelector(`[data-bilingual-translator-owned='true'][data-bilingual-translator-block-id='${blockId}']`) !== null;
+    return (
+      doc.querySelector(`[data-bilingual-translator-owned='true'][data-bilingual-translator-block-id='${blockId}']`) !== null ||
+      doc.querySelector(`[data-bilingual-translator-inline='true'][data-bilingual-translator-inline-block-id='${blockId}']`) !== null
+    );
   }
 
   function isCandidateSatisfied(candidate: CandidateBlock) {
@@ -312,7 +331,9 @@ export function createPageController(doc: Document, dependencies: PageController
         translationText,
         sourceText: candidate.sourceText,
         anchorElement: candidate.renderHint?.anchorElement,
-        expansionRoot: candidate.renderHint?.expansionRoot
+        expansionRoot: candidate.renderHint?.expansionRoot,
+        skipVirtualizedLayoutAdjustment: candidate.renderHint?.skipVirtualizedLayoutAdjustment,
+        renderAsSourceInline: candidate.renderHint?.renderAsSourceInline
       });
       translationMemory.set(getCandidateMemoryKey(candidate), translationText);
       inFlightSignatures.delete(getCandidateMemoryKey(candidate));
@@ -347,7 +368,8 @@ export function createPageController(doc: Document, dependencies: PageController
     }
   }
 
-  async function processCandidates(targetElements?: HTMLElement[]) {
+  async function processCandidates(targetElements?: HTMLElement[], options: ProcessCandidatesOptions = {}) {
+    const allowRequests = options.allowRequests ?? true;
     const eligibleCandidates = getEligibleCandidates(targetElements);
     const candidates = eligibleCandidates.slice(0, MAX_CANDIDATES_PER_PROCESS_CYCLE);
     debugLog("candidates/collected", {
@@ -367,6 +389,15 @@ export function createPageController(doc: Document, dependencies: PageController
     for (const candidate of candidates) {
       const cachedTranslation = translationMemory.get(getCandidateMemoryKey(candidate));
       if (!cachedTranslation) {
+        if (!allowRequests) {
+          debugLog("candidate/skipped-request-until-scroll-settles", {
+            blockId: candidate.blockId,
+            signature: getCandidateMemoryKey(candidate),
+            sourceText: candidate.sourceText
+          });
+          continue;
+        }
+
         if (inFlightSignatures.has(getCandidateMemoryKey(candidate))) {
           debugLog("candidate/skipped-inflight-duplicate", {
             blockId: candidate.blockId,
@@ -392,7 +423,9 @@ export function createPageController(doc: Document, dependencies: PageController
         translationText: cachedTranslation,
         sourceText: candidate.sourceText,
         anchorElement: candidate.renderHint?.anchorElement,
-        expansionRoot: candidate.renderHint?.expansionRoot
+        expansionRoot: candidate.renderHint?.expansionRoot,
+        skipVirtualizedLayoutAdjustment: candidate.renderHint?.skipVirtualizedLayoutAdjustment,
+        renderAsSourceInline: candidate.renderHint?.renderAsSourceInline
       });
       setCandidateState(candidate, "translated");
       debugLog("candidate/rehydrated-from-memory", {
@@ -415,7 +448,9 @@ export function createPageController(doc: Document, dependencies: PageController
           renderTranslationLoadingBelow(candidate.element, {
             blockId: candidate.blockId,
             anchorElement: candidate.renderHint?.anchorElement,
-            expansionRoot: candidate.renderHint?.expansionRoot
+            expansionRoot: candidate.renderHint?.expansionRoot,
+            skipVirtualizedLayoutAdjustment: candidate.renderHint?.skipVirtualizedLayoutAdjustment,
+            renderAsSourceInline: candidate.renderHint?.renderAsSourceInline
           });
         }
       });
@@ -472,6 +507,9 @@ export function createPageController(doc: Document, dependencies: PageController
       initialCandidates.map((candidate) => candidate.element),
       {
         onVisible: (elements) => {
+          void processCandidates(elements, { allowRequests: false });
+        },
+        onVisibleSettled: (elements) => {
           void processCandidates(elements);
         },
         onMutation: () => {
@@ -526,6 +564,9 @@ export function createPageController(doc: Document, dependencies: PageController
           initialCandidates.map((candidate) => candidate.element),
           {
             onVisible: (elements) => {
+              void processCandidates(elements, { allowRequests: false });
+            },
+            onVisibleSettled: (elements) => {
               void processCandidates(elements);
             },
             onMutation: () => {

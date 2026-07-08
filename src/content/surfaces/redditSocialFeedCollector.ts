@@ -127,7 +127,9 @@ export function collectRedditSocialFeedCandidateBlock(
       rehydrateKey: buildRedditRehydrateKey(page, ["comment", commentThingId, sourceText]),
       renderHint: {
         anchorElement: getCommentAnchorElement(comment.commentBody),
-        expansionRoot: comment.commentRoot
+        expansionRoot: comment.commentRoot,
+        skipVirtualizedLayoutAdjustment: true,
+        preserveExistingRenderedCopies: true
       }
     };
   }
@@ -150,7 +152,9 @@ export function collectRedditSocialFeedCandidateBlock(
         rehydrateKey: buildRedditRehydrateKey(page, ["card-title", sourceText]),
         renderHint: {
           anchorElement: titleElement,
-          expansionRoot: feedCard
+          expansionRoot: feedCard,
+          skipVirtualizedLayoutAdjustment: true,
+          preserveExistingRenderedCopies: true
         }
       };
     }
@@ -168,7 +172,9 @@ export function collectRedditSocialFeedCandidateBlock(
         rehydrateKey: buildRedditRehydrateKey(page, ["card-body", ...sourceText.split("\n\n")]),
         renderHint: {
           anchorElement: bodyElement,
-          expansionRoot: feedCard
+          expansionRoot: feedCard,
+          skipVirtualizedLayoutAdjustment: true,
+          preserveExistingRenderedCopies: true
         }
       };
     }
@@ -198,7 +204,9 @@ export function collectRedditSocialFeedCandidateBlock(
       rehydrateKey: buildRedditRehydrateKey(page, ["post-title", sourceText]),
       renderHint: {
         anchorElement: titleElement,
-        expansionRoot: feedCard
+        expansionRoot: feedCard,
+        skipVirtualizedLayoutAdjustment: true,
+        preserveExistingRenderedCopies: true
       }
     };
   }
@@ -213,7 +221,9 @@ export function collectRedditSocialFeedCandidateBlock(
         sourceText: getNormalizedText(bodyElement),
         rehydrateKey: buildRedditRehydrateKey(page, ["post-body", "0", getNormalizedText(bodyElement)]),
         renderHint: {
-          expansionRoot: feedCard
+          expansionRoot: feedCard,
+          skipVirtualizedLayoutAdjustment: true,
+          preserveExistingRenderedCopies: true
         }
       };
     }
@@ -232,7 +242,9 @@ export function collectRedditSocialFeedCandidateBlock(
         sourceText
       ]),
       renderHint: {
-        expansionRoot: feedCard
+        expansionRoot: feedCard,
+        skipVirtualizedLayoutAdjustment: true,
+        preserveExistingRenderedCopies: true
       }
     };
   }

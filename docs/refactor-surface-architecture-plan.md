@@ -81,4 +81,5 @@ This creates the new extension point while keeping current behavior stable befor
 - Added unit regression coverage for X page classification and tweet body candidate collection.
 - Added a browser fixture and smoke test for X-style post detail rendering; local execution requires a Playwright Chromium install.
 - Extended the X browser fixture with a reused-node mutation path and smoke coverage for retranslation after virtualized text replacement.
+- Social feed rendering now avoids loading placeholders, host-managed virtual-list transform rewrites, and cross-copy stale translation removal to reduce scroll-time flicker on X/Reddit.
 
