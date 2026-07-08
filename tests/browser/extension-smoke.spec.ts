@@ -414,6 +414,39 @@ test("translates X-style tweet bodies and quoted posts without touching page chr
   }
 });
 
+test("retranslates an X-style tweet body when a virtualized node reuses the same DOM element", async () => {
+  const mockServer = await startMockTranslationServer();
+  const userDataDir = test.info().outputPath("x-post-detail-reused-node-user-data");
+  const { context, background } = await launchExtensionContext(userDataDir);
+
+  try {
+    await configureMockTranslator(background, `${mockServer.origin}/v1/chat/completions`);
+
+    const page = await context.newPage();
+    await page.goto(buildFixtureUrl(mockServer.port, "/x-post-detail"));
+    await page.bringToFront();
+    const [tab] = await background.evaluate(async () => chrome.tabs.query({ active: true, currentWindow: true }));
+
+    await injectAndActivate(background, tab.id);
+
+    const primaryTweetTranslation = page.locator("#primary-tweet-text + [data-bilingual-translator-owned='true']");
+    await expect(primaryTweetTranslation).toContainText(
+      "中文翻译：Closing this week. Much of the teams building ChatGPT, Codex and OpenClaw will be there."
+    );
+
+    await page.locator("#reuse-tweet-node").click();
+
+    await expect(primaryTweetTranslation).toContainText(
+      "中文翻译：Updated text from a reused virtualized X post node."
+    );
+    await expect(primaryTweetTranslation).not.toContainText("Closing this week");
+    await expect(page.locator("#primary-tweet-text + [data-bilingual-translator-owned='true']")).toHaveCount(1);
+  } finally {
+    await context.close();
+    await mockServer.close();
+  }
+});
+
 test("groups generic commerce specification tables, description lists, and key-value grids into stable translated blocks", async () => {
   const mockServer = await startMockTranslationServer();
   const userDataDir = test.info().outputPath("commerce-specs-user-data");

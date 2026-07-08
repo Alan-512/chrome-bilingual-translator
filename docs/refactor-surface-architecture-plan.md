@@ -80,4 +80,5 @@ This creates the new extension point while keeping current behavior stable befor
 - Added an X/Twitter site profile with post body and action chrome selectors.
 - Added unit regression coverage for X page classification and tweet body candidate collection.
 - Added a browser fixture and smoke test for X-style post detail rendering; local execution requires a Playwright Chromium install.
+- Extended the X browser fixture with a reused-node mutation path and smoke coverage for retranslation after virtualized text replacement.
 

@@ -28,7 +28,7 @@
         <article data-testid="tweet">
           <div data-testid="User-Name">Tibo <span>@thstotiaux</span></div>
           <a href="/thstotiaux/status/1942073486123456789"><time datetime="2026-07-07">Jul 7</time></a>
-          <div data-testid="tweetText" lang="en">
+          <div id="primary-tweet-text" data-testid="tweetText" lang="en">
             Closing this week. Much of the teams building ChatGPT, Codex and OpenClaw will be there.
           </div>
           <div class="quote-card">
@@ -62,8 +62,17 @@
       <aside>
         <h2>Relevant people</h2>
         <p>Trending in technology</p>
+        <button id="reuse-tweet-node">Reuse tweet DOM node</button>
       </aside>
     </div>
+    <script>
+      document.getElementById("reuse-tweet-node")?.addEventListener("click", () => {
+        const tweetText = document.getElementById("primary-tweet-text");
+        if (tweetText) {
+          tweetText.textContent = "Updated text from a reused virtualized X post node.";
+        }
+      });
+    </script>
   </body>
 </html>
 
