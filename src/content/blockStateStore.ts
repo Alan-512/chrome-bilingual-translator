@@ -15,6 +15,10 @@ export class BlockStateStore {
     this.state.set(blockId, nextState);
   }
 
+  delete(blockId: string): void {
+    this.state.delete(blockId);
+  }
+
   clear(): void {
     this.state.clear();
   }

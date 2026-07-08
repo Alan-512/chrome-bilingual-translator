@@ -158,8 +158,24 @@ export function createPageController(doc: Document, dependencies: PageController
   const queuedBatches: QueuedBatch[] = [];
   const translationMemory = new Map<string, string>();
   const renderedMemoryBlockIds = new Map<string, string>();
+  const blockSourceSignatures = new Map<string, string>();
   const inFlightSignatures = new Set<string>();
   let activePageHref = doc.location?.href ?? "";
+
+  function setCandidateState(candidate: CandidateBlock, state: "queued" | "pending" | "translated" | "failed" | "skipped") {
+    blockSourceSignatures.set(candidate.blockId, getCandidateMemoryKey(candidate));
+    stateStore.set(candidate.blockId, state);
+  }
+
+  function clearCandidateState(blockId: string) {
+    const previousSignature = blockSourceSignatures.get(blockId);
+    if (previousSignature) {
+      inFlightSignatures.delete(previousSignature);
+    }
+
+    blockSourceSignatures.delete(blockId);
+    stateStore.delete(blockId);
+  }
 
   function removeStaleRenderedTranslationForMemoryKey(candidate: CandidateBlock) {
     const memoryKey = getCandidateMemoryKey(candidate);
@@ -178,6 +194,27 @@ export function createPageController(doc: Document, dependencies: PageController
 
   function isCandidateSatisfied(candidate: CandidateBlock) {
     const currentState = stateStore.get(candidate.blockId);
+
+    if (!currentState) {
+      return false;
+    }
+
+    const currentSignature = getCandidateMemoryKey(candidate);
+    const previousSignature = blockSourceSignatures.get(candidate.blockId);
+
+    if (previousSignature && previousSignature !== currentSignature) {
+      removeRenderedTranslationBlock(doc, candidate.blockId);
+      renderedMemoryBlockIds.delete(previousSignature);
+      failedBlockIds.delete(candidate.blockId);
+      clearCandidateState(candidate.blockId);
+      debugLog("candidate/source-changed", {
+        blockId: candidate.blockId,
+        previousSignature,
+        currentSignature,
+        sourceText: candidate.sourceText
+      });
+      return false;
+    }
 
     if (currentState === "queued" || currentState === "pending") {
       return true;
@@ -257,7 +294,7 @@ export function createPageController(doc: Document, dependencies: PageController
       pendingBlockCount = Math.max(0, pendingBlockCount - 1);
 
       if (!translationText) {
-        stateStore.set(candidate.blockId, "failed");
+        setCandidateState(candidate, "failed");
         removeRenderedTranslationBlock(doc, candidate.blockId);
         failedBlockIds.add(candidate.blockId);
         inFlightSignatures.delete(getCandidateMemoryKey(candidate));
@@ -280,7 +317,7 @@ export function createPageController(doc: Document, dependencies: PageController
       translationMemory.set(getCandidateMemoryKey(candidate), translationText);
       inFlightSignatures.delete(getCandidateMemoryKey(candidate));
       failedBlockIds.delete(candidate.blockId);
-      stateStore.set(candidate.blockId, "translated");
+      setCandidateState(candidate, "translated");
       translatedBlockCount += 1;
       debugLog("block/translated", {
         blockId: candidate.blockId,
@@ -357,7 +394,7 @@ export function createPageController(doc: Document, dependencies: PageController
         anchorElement: candidate.renderHint?.anchorElement,
         expansionRoot: candidate.renderHint?.expansionRoot
       });
-      stateStore.set(candidate.blockId, "translated");
+      setCandidateState(candidate, "translated");
       debugLog("candidate/rehydrated-from-memory", {
         blockId: candidate.blockId,
         signature: getCandidateMemoryKey(candidate),
@@ -373,7 +410,7 @@ export function createPageController(doc: Document, dependencies: PageController
     observerCoordinator.observeCandidates(candidatesNeedingRequests.map((candidate) => candidate.element));
     const batchPromises = chunkBlocks(candidatesNeedingRequests, TRANSLATION_BATCH_SIZE).map((candidateBatch) => {
       candidateBatch.forEach((candidate) => {
-        stateStore.set(candidate.blockId, "pending");
+        setCandidateState(candidate, "pending");
         if (!candidate.renderHint?.skipLoadingPlaceholder) {
           renderTranslationLoadingBelow(candidate.element, {
             blockId: candidate.blockId,
@@ -411,6 +448,7 @@ export function createPageController(doc: Document, dependencies: PageController
     queuedBatches.length = 0;
     translationMemory.clear();
     renderedMemoryBlockIds.clear();
+    blockSourceSignatures.clear();
     inFlightSignatures.clear();
     observerCoordinator.disconnect();
     removeRenderedTranslations(doc);
@@ -542,6 +580,7 @@ export function createPageController(doc: Document, dependencies: PageController
       queuedBatches.length = 0;
       translationMemory.clear();
       renderedMemoryBlockIds.clear();
+      blockSourceSignatures.clear();
       inFlightSignatures.clear();
       observerCoordinator.disconnect();
       removeRenderedTranslations(doc);

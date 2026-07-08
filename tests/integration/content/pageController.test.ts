@@ -176,6 +176,34 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("retranslates a reused DOM block when its source text changes", async () => {
+    const requestTranslations = vi.fn(async (blocks) =>
+      Object.fromEntries(blocks.map((block) => [block.blockId, `ZH:${block.sourceText}`]))
+    );
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    await controller.activate();
+
+    const paragraph = document.querySelector("p") as HTMLElement;
+    paragraph.textContent = "Updated text from a reused virtualized feed node.";
+
+    await controller.rescan();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(2);
+    expect(requestTranslations.mock.calls[1]?.[0]).toEqual([
+      expect.objectContaining({ sourceText: "Updated text from a reused virtualized feed node." })
+    ]);
+    expect(document.querySelectorAll("[data-bilingual-translator-owned='true']")).toHaveLength(2);
+    expect(document.body.textContent).not.toContain("ZH:Hello world from a real content paragraph.");
+    expect(document.body.textContent).toContain("ZH:Updated text from a reused virtualized feed node.");
+    await controller.deactivate();
+  });
+
   it("translates Reddit feed card titles and preview bodies as separate listing blocks", async () => {
     window.history.replaceState({}, "", "/r/codex/");
     document.body.innerHTML = `

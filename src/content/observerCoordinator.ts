@@ -128,6 +128,7 @@ export function createObserverCoordinator(
       if (doc.body) {
         mutationObserver.observe(doc.body, {
           childList: true,
+          characterData: true,
           subtree: true
         });
       }

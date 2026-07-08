@@ -97,6 +97,60 @@ describe("observerCoordinator", () => {
     vi.useRealTimers();
   });
 
+  it("observes text-node mutations for virtualized DOM reuse", () => {
+    vi.useFakeTimers();
+    let mutationCallback: MutationCallback | undefined;
+    const mutationObserve = vi.fn();
+
+    const coordinator = createObserverCoordinator(document, {
+      createIntersectionObserver() {
+        return {
+          observe: vi.fn(),
+          disconnect: vi.fn()
+        } as unknown as IntersectionObserver;
+      },
+      createMutationObserver(callback) {
+        mutationCallback = callback;
+        return {
+          observe: mutationObserve,
+          disconnect: vi.fn()
+        } as unknown as MutationObserver;
+      }
+    });
+
+    const onMutation = vi.fn();
+    coordinator.start([], {
+      onVisible: vi.fn(),
+      onMutation
+    });
+
+    expect(mutationObserve).toHaveBeenCalledWith(document.body, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+
+    const paragraph = document.createElement("p");
+    const textNode = document.createTextNode("Updated feed text");
+    paragraph.appendChild(textNode);
+    mutationCallback?.(
+      [
+        {
+          type: "characterData",
+          target: textNode,
+          addedNodes: [] as unknown as NodeList,
+          removedNodes: [] as unknown as NodeList
+        }
+      ] as MutationRecord[],
+      {} as MutationObserver
+    );
+
+    vi.runAllTimers();
+
+    expect(onMutation).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
   it("batches rapid mutation events into a single callback tick", async () => {
     vi.useFakeTimers();
     let mutationCallback: MutationCallback | undefined;
