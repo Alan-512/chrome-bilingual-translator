@@ -76,6 +76,23 @@ Notes:
 
 ## Share With Other People
 
+### Install From A GitHub Release
+
+For non-developer testers, use the prebuilt release zip:
+
+1. Open the latest GitHub Release.
+2. Download `chrome-bilingual-translator-v0.1.0-alpha.1.zip`.
+3. Unzip it.
+4. Open `chrome://extensions` in Chrome.
+5. Turn on `Developer mode`.
+6. Click `Load unpacked`.
+7. Select the unzipped folder that contains `manifest.json`.
+8. Open the extension options page and configure your own API provider, API key, model, and target language.
+
+This alpha build is intended for small-scale testing. It is not published to the Chrome Web Store yet, so Chrome requires loading it through Developer mode.
+
+### Build And Share Manually
+
 For small-scale sharing, the practical way is:
 
 1. Run:
