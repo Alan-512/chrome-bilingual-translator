@@ -1117,6 +1117,83 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("discards a delayed Reddit listing translation after navigating into the post detail", async () => {
+    type DeferredBatch = {
+      blocks: Array<{ blockId: string; sourceText: string }>;
+      resolve: (translations: Record<string, string>) => void;
+    };
+    const deferredBatches: DeferredBatch[] = [];
+    const requestTranslations = vi.fn(
+      (blocks: Array<{ blockId: string; sourceText: string }>) =>
+        new Promise<Record<string, string>>((resolve) => {
+          deferredBatches.push({ blocks, resolve });
+        })
+    );
+
+    window.history.replaceState({}, "", "/r/codex/");
+    document.body.innerHTML = `
+      <main>
+        <shreddit-post>
+          <div slot="text-body">
+            <p>The first paragraph stays mounted during navigation.</p>
+            <p>The second paragraph stays mounted during navigation.</p>
+          </div>
+        </shreddit-post>
+      </main>
+    `;
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      isElementReadyForTranslation: (element) =>
+        element.getAttribute("slot") === "text-body" || element.tagName === "P",
+      createObserverCoordinator: createNoopObserverCoordinator
+    });
+
+    const listingActivation = controller.activate();
+    await settlePromises();
+
+    expect(deferredBatches).toHaveLength(1);
+    expect(deferredBatches[0]?.blocks.map((block) => block.sourceText)).toEqual([
+      "The first paragraph stays mounted during navigation.\n\nThe second paragraph stays mounted during navigation."
+    ]);
+
+    window.history.replaceState({}, "", "/r/codex/comments/abc123/example-post/");
+    const detailActivation = controller.activate();
+    await settlePromises();
+
+    expect(deferredBatches).toHaveLength(2);
+    expect(deferredBatches[1]?.blocks.map((block) => block.sourceText)).toEqual([
+      "The first paragraph stays mounted during navigation.",
+      "The second paragraph stays mounted during navigation."
+    ]);
+
+    const detailBatch = deferredBatches[1]!;
+    detailBatch.resolve(
+      Object.fromEntries(detailBatch.blocks.map((block) => [block.blockId, `DETAIL:${block.sourceText}`]))
+    );
+    await detailActivation;
+
+    const listingBatch = deferredBatches[0]!;
+    listingBatch.resolve(
+      Object.fromEntries(listingBatch.blocks.map((block) => [block.blockId, `LISTING:${block.sourceText}`]))
+    );
+    await listingActivation;
+    await settlePromises();
+
+    const renderedTranslations = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-bilingual-translator-owned='true']")
+    );
+    expect(renderedTranslations).toHaveLength(2);
+    expect(renderedTranslations.map((element) => element.textContent)).toEqual([
+      "DETAIL:The first paragraph stays mounted during navigation.",
+      "DETAIL:The second paragraph stays mounted during navigation."
+    ]);
+    expect(document.body.textContent).not.toContain("LISTING:");
+
+    await controller.deactivate();
+  });
+
   it("translates youtube-like lazy loaded comment replies when a thread appends them after the initial render", async () => {
     let mutationCallback: (() => void) | undefined;
     const requestTranslations = vi.fn(async (blocks) =>

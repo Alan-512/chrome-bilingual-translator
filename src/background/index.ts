@@ -119,13 +119,13 @@ async function sendLifecycleMessage(tabId: number, type: "page/activate" | "page
   });
 }
 
-async function bootstrap() {
+function bootstrap() {
   if (typeof chrome === "undefined" || !chrome.contextMenus || !chrome.runtime?.onMessage) {
     return;
   }
 
-  await ensureMenuRegistered();
-
+  // Register Service Worker event listeners synchronously before any async startup work.
+  // A cold-start context-menu event can arrive while menu registration is still pending.
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "local" && changes.extensionConfig) {
       const oldLang = (changes.extensionConfig.oldValue as any)?.targetLanguage;
@@ -341,6 +341,10 @@ async function bootstrap() {
     })();
 
     return true;
+  });
+
+  void ensureMenuRegistered().catch((error) => {
+    console.error("Failed to register context menus:", error);
   });
 }
 

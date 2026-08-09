@@ -43,6 +43,7 @@ const MAX_CANDIDATES_PER_PROCESS_CYCLE = TRANSLATION_BATCH_SIZE * 3;
 type CandidateBlock = ReturnType<typeof collectCandidateBlocks>[number];
 type QueuedBatch = {
   candidates: CandidateBlock[];
+  generation: number;
   resolve: () => void;
 };
 type ProcessCandidatesOptions = {
@@ -171,6 +172,13 @@ export function createPageController(doc: Document, dependencies: PageController
   const blockSourceSignatures = new Map<string, string>();
   const inFlightSignatures = new Set<string>();
   let activePageHref = doc.location?.href ?? "";
+  let lifecycleGeneration = 0;
+
+  function cancelQueuedBatches() {
+    while (queuedBatches.length > 0) {
+      queuedBatches.shift()?.resolve();
+    }
+  }
 
   function setCandidateState(candidate: CandidateBlock, state: "queued" | "pending" | "translated" | "failed" | "skipped") {
     blockSourceSignatures.set(candidate.blockId, getCandidateMemoryKey(candidate));
@@ -294,7 +302,11 @@ export function createPageController(doc: Document, dependencies: PageController
     });
   }
 
-  async function processBatch(batch: CandidateBlock[]) {
+  async function processBatch(batch: CandidateBlock[], generation: number) {
+    if (!active || generation !== lifecycleGeneration) {
+      return;
+    }
+
     debugLog("batch/request", {
       batchSize: batch.length,
       blockIds: batch.map((candidate) => candidate.blockId)
@@ -306,6 +318,15 @@ export function createPageController(doc: Document, dependencies: PageController
         sourceText: candidate.sourceText
       }))
     );
+
+    if (!active || generation !== lifecycleGeneration) {
+      debugLog("batch/discarded-stale", {
+        batchSize: batch.length,
+        blockIds: batch.map((candidate) => candidate.blockId)
+      });
+      return;
+    }
+
     lastError = batchResult.lastError ?? lastError;
 
     for (const candidate of batch) {
@@ -358,17 +379,27 @@ export function createPageController(doc: Document, dependencies: PageController
         return;
       }
 
+      if (nextBatch.generation !== lifecycleGeneration) {
+        nextBatch.resolve();
+        continue;
+      }
+
       inFlightBatchCount += 1;
-      void processBatch(nextBatch.candidates)
+      void processBatch(nextBatch.candidates, nextBatch.generation)
         .finally(() => {
-          inFlightBatchCount = Math.max(0, inFlightBatchCount - 1);
+          if (nextBatch.generation === lifecycleGeneration) {
+            inFlightBatchCount = Math.max(0, inFlightBatchCount - 1);
+          }
           nextBatch.resolve();
-          drainQueuedBatches();
+          if (nextBatch.generation === lifecycleGeneration) {
+            drainQueuedBatches();
+          }
         });
     }
   }
 
   async function processCandidates(targetElements?: HTMLElement[], options: ProcessCandidatesOptions = {}) {
+    const generation = lifecycleGeneration;
     const allowRequests = options.allowRequests ?? true;
     const eligibleCandidates = getEligibleCandidates(targetElements);
     const candidates = eligibleCandidates.slice(0, MAX_CANDIDATES_PER_PROCESS_CYCLE);
@@ -462,6 +493,7 @@ export function createPageController(doc: Document, dependencies: PageController
       });
       queuedBatches.push({
         candidates: candidateBatch,
+        generation,
         resolve: resolveBatch
       });
 
@@ -469,18 +501,22 @@ export function createPageController(doc: Document, dependencies: PageController
     });
 
     await syncPageState();
+    if (!active || generation !== lifecycleGeneration) {
+      return;
+    }
     drainQueuedBatches();
 
     await Promise.all(batchPromises);
   }
 
   function resetPageStateForNavigation() {
+    lifecycleGeneration += 1;
     translatedBlockCount = 0;
     pendingBlockCount = 0;
     inFlightBatchCount = 0;
     lastError = null;
     failedBlockIds.clear();
-    queuedBatches.length = 0;
+    cancelQueuedBatches();
     translationMemory.clear();
     renderedMemoryBlockIds.clear();
     blockSourceSignatures.clear();
@@ -612,13 +648,14 @@ export function createPageController(doc: Document, dependencies: PageController
 
     async deactivate() {
       active = false;
+      lifecycleGeneration += 1;
       activePageHref = doc.location?.href ?? "";
       translatedBlockCount = 0;
       pendingBlockCount = 0;
       inFlightBatchCount = 0;
       lastError = null;
       failedBlockIds.clear();
-      queuedBatches.length = 0;
+      cancelQueuedBatches();
       translationMemory.clear();
       renderedMemoryBlockIds.clear();
       blockSourceSignatures.clear();
