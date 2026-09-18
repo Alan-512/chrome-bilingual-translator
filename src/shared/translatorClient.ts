@@ -79,8 +79,37 @@ async function readApiErrorMessage(response: Response): Promise<string> {
   return `Translation request failed with ${response.status} ${response.statusText}`.trim();
 }
 
+function unwrapJsonCodeFence(content: string) {
+  const trimmedContent = content.trim();
+  const codeFenceMatch = trimmedContent.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return codeFenceMatch ? codeFenceMatch[1].trim() : trimmedContent;
+}
+
+function normalizeTranslationPayload(parsed: unknown): Record<string, unknown> {
+  if (Array.isArray(parsed)) {
+    return Object.fromEntries(
+      parsed.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") {
+          return [];
+        }
+
+        const record = entry as Record<string, unknown>;
+        return typeof record.blockId === "string" && typeof record.translation === "string"
+          ? [[record.blockId, record.translation]]
+          : [];
+      })
+    );
+  }
+
+  if (parsed && typeof parsed === "object") {
+    return parsed as Record<string, unknown>;
+  }
+
+  throw new Error("Translation response must be a JSON object or array.");
+}
+
 function parseTranslationPayload(content: string, expectedBlockIds: string[]): Record<string, string> {
-  const parsed = JSON.parse(content) as Record<string, unknown>;
+  const parsed = normalizeTranslationPayload(JSON.parse(unwrapJsonCodeFence(content)));
   const missingBlockIds = expectedBlockIds.filter((blockId) => typeof parsed[blockId] !== "string");
 
   if (missingBlockIds.length > 0) {

@@ -162,7 +162,7 @@ Recommended example:
 - `Provider`: `Google Gemini`
 - `API Base URL`: `https://generativelanguage.googleapis.com/v1beta`
 - `API Key`: your Gemini API key
-- `Model`: for example `gemini-3.1-flash-lite-preview`
+- `Model`: for example `gemini-3.5-flash-lite`
 
 The extension will call Gemini's native `generateContent` endpoint in this mode.
 

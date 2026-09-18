@@ -132,7 +132,7 @@ function collectFormInput(controls: OptionsFormControls): PersistedExtensionConf
 function applyProviderPreset(controls: OptionsFormControls) {
   if (controls.provider.value === GEMINI_PROVIDER) {
     controls.apiBaseUrl.value = GEMINI_API_BASE_URL;
-    controls.model.value = "gemini-3.1-flash-lite-preview";
+    controls.model.value = "gemini-3.5-flash-lite";
   } else if (controls.provider.value === OPENROUTER_PROVIDER) {
     controls.apiBaseUrl.value = OPENROUTER_API_BASE_URL;
     controls.model.value = "google/gemini-2.5-flash";
