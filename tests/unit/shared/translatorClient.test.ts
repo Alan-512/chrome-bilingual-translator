@@ -6,6 +6,44 @@ import { PersistentTranslationCache } from "../../../src/shared/cacheStore";
 import { createTranslatorClient } from "../../../src/shared/translatorClient";
 
 describe("translator client", () => {
+  it("returns provider translations when cache persistence fails", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({ alpha: "第一段" })
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    const cache = new PersistentTranslationCache({
+      get: async () => ({}),
+      set: async () => {
+        throw new Error("FILE_ERROR_NO_SPACE");
+      }
+    });
+    const client = createTranslatorClient({ fetchImpl: fetchMock, cache });
+
+    await expect(
+      client.translateBlocks({
+        config: buildPersistedConfigRecord({
+          provider: "openai-compatible",
+          apiBaseUrl: "https://api.example.com/v1/chat/completions",
+          apiKey: "secret-key",
+          model: "gpt-5-mini",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        }),
+        blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+      })
+    ).resolves.toEqual({ alpha: "第一段" });
+  });
+
   it("builds an OpenAI-compatible request body and returns translations by block id", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       expect(init?.method).toBe("POST");
@@ -68,6 +106,80 @@ describe("translator client", () => {
       beta: "第二段"
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts JSON wrapped in a markdown code fence", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "```json\n{\"alpha\":\"第一段\"}\n```"
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    await expect(
+      client.translateBlocks({
+        config: buildPersistedConfigRecord({
+          provider: "openai-compatible",
+          apiBaseUrl: "https://api.example.com/v1/chat/completions",
+          apiKey: "secret-key",
+          model: "gpt-5-mini",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        }),
+        blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+      })
+    ).resolves.toEqual({ alpha: "第一段" });
+  });
+
+  it("accepts fenced Gemini translation arrays keyed by block id", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: '```json\n[{"blockId":"alpha","translation":"第一段"}]\n```'
+                  }
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+
+    await expect(
+      client.translateBlocks({
+        config: buildPersistedConfigRecord({
+          provider: "google-gemini",
+          apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+          apiKey: "secret-key",
+          model: "gemini-3.5-flash-lite",
+          translateTitles: true,
+          translateShortContentBlocks: true
+        }),
+        blocks: [{ blockId: "alpha", sourceText: "Hello world" }]
+      })
+    ).resolves.toEqual({ alpha: "第一段" });
   });
 
   it("adds low reasoning effort for official OpenAI endpoints", async () => {
@@ -440,7 +552,7 @@ describe("translator client", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
       const body = JSON.parse(String(init?.body));
-      expect(body.model).toBe("gemini-3.1-flash-lite-preview");
+      expect(body.model).toBe("gemini-3.5-flash-lite");
       expect(body.response_format).toBeUndefined();
       expect(body.messages[0].role).toBe("system");
       expect(body.messages[0].content).toContain("strict JSON object");
@@ -472,7 +584,7 @@ describe("translator client", () => {
         provider: "openai-compatible",
         apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         apiKey: "secret-key",
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-3.5-flash-lite",
         translateTitles: true,
         translateShortContentBlocks: true
       }),
@@ -538,7 +650,7 @@ describe("translator client", () => {
   it("supports native Google Gemini generateContent requests", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
       );
       expect(init?.headers).toMatchObject({
         "Content-Type": "application/json",
@@ -579,7 +691,7 @@ describe("translator client", () => {
         provider: "google-gemini",
         apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
         apiKey: "secret-key",
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-3.5-flash-lite",
         translateTitles: true,
         translateShortContentBlocks: true
       }),
@@ -748,7 +860,7 @@ describe("translator client", () => {
           provider: "google-gemini",
           apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
           apiKey: "secret-key",
-          model: "gemini-3.1-flash-lite-preview",
+          model: "gemini-3.5-flash-lite",
           translateTitles: true,
           translateShortContentBlocks: true
         })
@@ -772,13 +884,13 @@ describe("translator client", () => {
           provider: "google-gemini",
           apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
           apiKey: "secret-key",
-          model: "gemini-3.1-flash-lite-preview",
+          model: "gemini-3.5-flash-lite",
           translateTitles: true,
           translateShortContentBlocks: true
         })
       })
     ).rejects.toThrow(
-      /network request to https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.1-flash-lite-preview:generateContent failed/i
+      /network request to https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.5-flash-lite:generateContent failed/i
     );
   });
 
@@ -833,7 +945,7 @@ describe("translator client", () => {
   it("supports selection native Google Gemini generateContent requests", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
       );
       const body = JSON.parse(String(init?.body));
       expect(body.systemInstruction.parts[0].text).toContain("translation");
@@ -869,7 +981,7 @@ describe("translator client", () => {
         provider: "google-gemini",
         apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
         apiKey: "secret-key",
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-3.5-flash-lite",
         translateTitles: true,
         translateShortContentBlocks: true,
         targetLanguage: "en"

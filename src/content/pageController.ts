@@ -195,6 +195,19 @@ export function createPageController(doc: Document, dependencies: PageController
     stateStore.delete(blockId);
   }
 
+  function resetFailedCandidates() {
+    if (failedBlockIds.size === 0) {
+      return;
+    }
+
+    for (const blockId of failedBlockIds) {
+      clearCandidateState(blockId);
+    }
+
+    failedBlockIds.clear();
+    lastError = null;
+  }
+
   function removeStaleRenderedTranslationForMemoryKey(candidate: CandidateBlock) {
     const memoryKey = getCandidateMemoryKey(candidate);
 
@@ -249,6 +262,10 @@ export function createPageController(doc: Document, dependencies: PageController
 
     if (currentState === "translated") {
       return hasRenderedTranslationBlock(candidate.blockId);
+    }
+
+    if (currentState === "failed") {
+      return true;
     }
 
     return false;
@@ -341,7 +358,8 @@ export function createPageController(doc: Document, dependencies: PageController
         debugLog("block/failed", {
           blockId: candidate.blockId,
           signature: getCandidateMemoryKey(candidate),
-          sourceText: candidate.sourceText
+          sourceText: candidate.sourceText,
+          ...(batchResult.lastError ? { error: batchResult.lastError.message } : {})
         });
         continue;
       }
@@ -631,6 +649,7 @@ export function createPageController(doc: Document, dependencies: PageController
         return;
       }
 
+      resetFailedCandidates();
       await processCandidates();
     },
 
@@ -639,6 +658,7 @@ export function createPageController(doc: Document, dependencies: PageController
         return;
       }
 
+      resetFailedCandidates();
       const nextCandidates = collectCandidateBlocks(doc)
         .filter((candidate) => !isCandidateSatisfied(candidate))
         .map((candidate) => candidate.element);

@@ -977,6 +977,41 @@ describe("pageController", () => {
     await controller.deactivate();
   });
 
+  it("does not retry failed blocks from mutation scans", async () => {
+    let mutationCallback: (() => void) | undefined;
+    const debugLog = vi.fn();
+    const requestTranslations = vi.fn(async () => {
+      throw new Error("FILE_ERROR_NO_SPACE");
+    });
+
+    const controller = createPageController(document, {
+      requestTranslations,
+      reportPageState: async () => {},
+      debugLog,
+      createObserverCoordinator: () => ({
+        start(_candidates, callbacks) {
+          mutationCallback = callbacks.onMutation;
+        },
+        observeCandidates() {},
+        disconnect() {}
+      })
+    });
+
+    await controller.activate();
+    const callCountAfterFailure = requestTranslations.mock.calls.length;
+
+    expect(debugLog).toHaveBeenCalledWith(
+      "block/failed",
+      expect.objectContaining({ error: "FILE_ERROR_NO_SPACE" })
+    );
+
+    mutationCallback?.();
+    await settlePromises();
+
+    expect(requestTranslations).toHaveBeenCalledTimes(callCountAfterFailure);
+    await controller.deactivate();
+  });
+
   it("keeps successful translations even when one block is missing from the batch response", async () => {
     const requestTranslations = vi.fn(async (blocks: Array<{ blockId: string; sourceText: string }>) => {
       return {

@@ -298,7 +298,7 @@ describe("mountOptionsPage", () => {
 
     expect(apiBaseUrlInput.value).toBe("https://generativelanguage.googleapis.com/v1beta");
     expect((document.querySelector("[name='model']") as HTMLInputElement).value).toBe(
-      "gemini-3.1-flash-lite-preview"
+      "gemini-3.5-flash-lite"
     );
   });
 
@@ -318,7 +318,7 @@ describe("mountOptionsPage", () => {
 
     apiBaseUrlInput.value = "";
     (document.querySelector("[name='apiKey']") as HTMLInputElement).value = "gemini-key";
-    (document.querySelector("[name='model']") as HTMLInputElement).value = "gemini-3.1-flash-lite-preview";
+    (document.querySelector("[name='model']") as HTMLInputElement).value = "gemini-3.5-flash-lite";
 
     document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await flushAsyncWork();
@@ -343,7 +343,7 @@ describe("mountOptionsPage", () => {
 
     (document.querySelector("[name='apiBaseUrl']") as HTMLInputElement).value = "https://custom-gemini-host.example.com/v1beta";
     (document.querySelector("[name='apiKey']") as HTMLInputElement).value = "gemini-key";
-    (document.querySelector("[name='model']") as HTMLInputElement).value = "gemini-3.1-flash-lite-preview";
+    (document.querySelector("[name='model']") as HTMLInputElement).value = "gemini-3.5-flash-lite";
 
     document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await flushAsyncWork();
