@@ -12,6 +12,6 @@ describe("manifest", () => {
     expect(typeof manifest.key).toBe("string");
     expect(manifest.key?.length).toBeGreaterThan(100);
     expect(manifest.version).toMatch(/^\d+(?:\.\d+){0,3}$/);
-    expect(manifest.version_name).toBe("0.1.0-alpha.1");
+    expect(manifest.version_name).toBe("0.1.0-alpha.2");
   });
 });

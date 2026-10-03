@@ -81,7 +81,7 @@ Notes:
 For non-developer testers, use the prebuilt release zip:
 
 1. Open the latest GitHub Release.
-2. Download `chrome-bilingual-translator-v0.1.0-alpha.1.zip`.
+2. Download `chrome-bilingual-translator-v0.1.0-alpha.2.zip`.
 3. Unzip it.
 4. Open `chrome://extensions` in Chrome.
 5. Turn on `Developer mode`.
