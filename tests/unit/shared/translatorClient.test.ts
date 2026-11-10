@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildPersistedConfigRecord } from "../../../src/shared/config";
+import { buildPersistedConfigRecord, DEFAULT_EXTENSION_CONFIG } from "../../../src/shared/config";
 import { createMemoryStorageArea } from "../../../src/shared/storage";
 import { PersistentTranslationCache } from "../../../src/shared/cacheStore";
 import { createTranslatorClient } from "../../../src/shared/translatorClient";
@@ -516,9 +516,11 @@ describe("translator client", () => {
               content: [
                 {
                   type: "output_text",
-                  text: JSON.stringify({
-                    alpha: "第一段"
-                  })
+                  text: '{"alpha":"第'
+                },
+                {
+                  type: "output_text",
+                  text: '一段"}'
                 }
               ]
             }
@@ -942,41 +944,45 @@ describe("translator client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("supports selection native Google Gemini generateContent requests", async () => {
+  it.each([false, true])("assembles and caches the complete Gemini explanation (legacy cache: %s)", async (hasLegacyCache) => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
       );
       const body = JSON.parse(String(init?.body));
-      expect(body.systemInstruction.parts[0].text).toContain("translation");
+      expect(body.systemInstruction.parts[0].text).toContain("Explain");
       const userContent = JSON.parse(body.contents[0].parts[0].text);
-      expect(userContent.selectedText).toBe("bonjour");
-      expect(userContent.surroundingContext).toBe("bonjour tout le monde");
+      expect(userContent.selectedText).toBe("技术性调整");
+      expect(userContent.surroundingContext).toBe("从高点回落超过 10%，通常称为技术性调整。");
 
       return new Response(
         JSON.stringify({
           candidates: [
             {
+              finishReason: "STOP",
               content: {
                 parts: [
-                  {
-                    text: "hello"
-                  }
+                  { text: "Consider the market context.", thought: true },
+                  { text: "技术" },
+                  { text: "性调整通常指市场从高点回落约 10%。" },
+                  { text: "\n\n它描述的是价格回落幅度。" }
                 ]
               }
-            }
+            },
+            { content: { parts: [{ text: "Alternative candidate" }] } }
           ]
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     });
 
-    const client = createTranslatorClient({
-      fetchImpl: fetchMock,
-      cache: new PersistentTranslationCache(createMemoryStorageArea())
-    });
+    const cache = new PersistentTranslationCache(createMemoryStorageArea());
+    if (hasLegacyCache) {
+      await cache.setMany([{ sourceText: "selection:explain:技术性调整", translation: "技术" }], "zh-CN");
+    }
+    const client = createTranslatorClient({ fetchImpl: fetchMock, cache });
 
-    const result = await client.translateOrExplainSelection({
+    const input = {
       config: buildPersistedConfigRecord({
         provider: "google-gemini",
         apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
@@ -984,15 +990,72 @@ describe("translator client", () => {
         model: "gemini-3.5-flash-lite",
         translateTitles: true,
         translateShortContentBlocks: true,
-        targetLanguage: "en"
+        debugMode: false,
+        targetLanguage: "zh-CN"
       }),
-      action: "translate",
-      selectionText: "bonjour",
-      contextText: "bonjour tout le monde"
-    });
+      action: "explain" as const,
+      selectionText: "技术性调整",
+      contextText: "从高点回落超过 10%，通常称为技术性调整。"
+    };
 
-    expect(result).toBe("hello");
+    const expected = "技术性调整通常指市场从高点回落约 10%。\n\n它描述的是价格回落幅度。";
+    await expect(client.translateOrExplainSelection(input)).resolves.toBe(expected);
+    await expect(client.translateOrExplainSelection(input)).resolves.toBe(expected);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    {
+      provider: "openai-compatible",
+      apiBaseUrl: "https://api.example.com/v1/chat/completions",
+      incomplete: { choices: [{ finish_reason: "length", message: { content: "技术" } }] },
+      complete: { choices: [{ finish_reason: "stop", message: { content: "完整解释" } }] }
+    },
+    {
+      provider: "openai-compatible",
+      apiBaseUrl: "https://api.example.com/v1/responses",
+      incomplete: { status: "incomplete", output_text: "技术" },
+      complete: { status: "completed", output_text: "完整解释" }
+    },
+    {
+      provider: "google-gemini",
+      apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      incomplete: {
+        candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: "技术" }] } }]
+      },
+      complete: {
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text: "完整解释" }] } }]
+      }
+    }
+  ] as const)("rejects and does not cache incomplete selection results from $apiBaseUrl", async ({
+    provider,
+    apiBaseUrl,
+    incomplete,
+    complete
+  }) => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json(incomplete))
+      .mockResolvedValueOnce(Response.json(complete));
+    const client = createTranslatorClient({
+      fetchImpl: fetchMock,
+      cache: new PersistentTranslationCache(createMemoryStorageArea())
+    });
+    const input = {
+      config: buildPersistedConfigRecord({
+        ...DEFAULT_EXTENSION_CONFIG,
+        provider,
+        apiBaseUrl,
+        apiKey: "secret-key",
+        model: "test-model"
+      }),
+      action: "explain" as const,
+      selectionText: "技术性调整",
+      contextText: "股市中的技术性调整"
+    };
+
+    await expect(client.translateOrExplainSelection(input)).rejects.toThrow("模型未生成完整结果，请重试。");
+    await expect(client.translateOrExplainSelection(input)).resolves.toBe("完整解释");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("caches selection translation/explanation results and returns them without calling API", async () => {

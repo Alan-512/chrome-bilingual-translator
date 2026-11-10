@@ -28,6 +28,7 @@ type CreateTranslatorClientOptions = {
 
 type OpenAiCompatibleResponse = {
   choices?: Array<{
+    finish_reason?: string;
     message?: {
       content?: string;
     };
@@ -35,6 +36,7 @@ type OpenAiCompatibleResponse = {
 };
 
 type ResponsesApiResponse = {
+  status?: string;
   output_text?: string;
   output?: Array<{
     content?: Array<{
@@ -46,9 +48,11 @@ type ResponsesApiResponse = {
 
 type GeminiGenerateContentResponse = {
   candidates?: Array<{
+    finishReason?: string;
     content?: {
       parts?: Array<{
         text?: string;
+        thought?: boolean;
       }>;
     };
   }>;
@@ -243,15 +247,19 @@ function extractResponsesApiText(responseBody: ResponsesApiResponse): string | n
     return responseBody.output_text;
   }
 
+  let text = "";
   for (const outputItem of responseBody.output ?? []) {
     for (const contentItem of outputItem.content ?? []) {
-      if (typeof contentItem.text === "string" && contentItem.text.trim()) {
-        return contentItem.text;
+      if (
+        (contentItem.type === undefined || contentItem.type === "output_text") &&
+        typeof contentItem.text === "string"
+      ) {
+        text += contentItem.text;
       }
     }
   }
 
-  return null;
+  return text.trim() ? text : null;
 }
 
 function buildApiTestRequest(config: ExtensionConfig) {
@@ -353,15 +361,14 @@ function buildGeminiTranslationBody(model: string, blocks: TranslationBlockInput
 }
 
 function extractGeminiText(responseBody: GeminiGenerateContentResponse): string | null {
-  for (const candidate of responseBody.candidates ?? []) {
-    for (const part of candidate.content?.parts ?? []) {
-      if (typeof part.text === "string" && part.text.trim()) {
-        return part.text;
-      }
+  let text = "";
+  for (const part of responseBody.candidates?.[0]?.content?.parts ?? []) {
+    if (!part.thought && typeof part.text === "string") {
+      text += part.text;
     }
   }
 
-  return null;
+  return text.trim() ? text : null;
 }
 
 function isAbortError(error: unknown) {
@@ -683,7 +690,8 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
     },
 
     async translateOrExplainSelection({ config, action, selectionText, contextText }) {
-      const cacheKey = `selection:${action}:${selectionText}`;
+      // Older selection entries may contain only the first part of the response.
+      const cacheKey = `selection:v2:${action}:${selectionText}`;
       const cachedResult = await options.cache.get(cacheKey, config.targetLanguage);
       if (cachedResult) {
         return cachedResult;
@@ -759,6 +767,17 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
         const responseBody = (await response.json()) as OpenAiCompatibleResponse &
           ResponsesApiResponse &
           GeminiGenerateContentResponse;
+        const incomplete =
+          request.mode === "gemini"
+            ? responseBody.candidates?.[0]?.finishReason === "MAX_TOKENS"
+            : request.mode === "chat"
+              ? responseBody.choices?.[0]?.finish_reason === "length"
+              : responseBody.status === "incomplete";
+
+        if (incomplete) {
+          throw new Error("模型未生成完整结果，请重试。");
+        }
+
         const content =
           request.mode === "gemini"
             ? extractGeminiText(responseBody)
@@ -766,11 +785,11 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
               ? responseBody.choices?.[0]?.message?.content
               : extractResponsesApiText(responseBody);
 
-        if (!content) {
+        const finalResult = content?.trim();
+        if (!finalResult) {
           throw new Error("Selection translation/explanation response did not include a content payload.");
         }
 
-        const finalResult = content.trim();
         await options.cache.setMany(
           [{ sourceText: cacheKey, translation: finalResult }],
           config.targetLanguage
