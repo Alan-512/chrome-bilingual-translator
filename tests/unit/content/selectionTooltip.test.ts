@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from "vitest";
-import { getSelectionAndContext } from "../../../src/content/selectionTooltip";
+import { getSelectionAndContext, SelectionTooltipManager } from "../../../src/content/selectionTooltip";
 
 describe("getSelectionAndContext", () => {
   it("includes only rendered images within the selected text range for explanation", () => {
@@ -103,6 +103,46 @@ describe("getSelectionAndContext", () => {
       expect(result?.contextText).toBe("short text with selected word");
     } finally {
       document.body.removeChild(textarea);
+    }
+  });
+});
+
+describe("SelectionTooltipManager", () => {
+  it("keeps the active drag handle and its position when the explanation arrives", () => {
+    const tooltip = SelectionTooltipManager.getInstance();
+    const attachShadow = vi.spyOn(HTMLElement.prototype, "attachShadow");
+
+    try {
+      tooltip.showLoading(new DOMRect(210, 220, 60, 20), "explain", "图片");
+      const root = attachShadow.mock.results[0]!.value as ShadowRoot;
+      const host = root.host as HTMLElement;
+      const handle = root.querySelector<HTMLElement>(".tooltip-title")!;
+      const startLeft = Number.parseFloat(host.style.left);
+      const startTop = Number.parseFloat(host.style.top);
+      host.getBoundingClientRect = () => new DOMRect(startLeft, startTop);
+      handle.setPointerCapture = vi.fn();
+
+      const pointer = (type: string, dx: number, dy: number) => {
+        handle.dispatchEvent(Object.assign(new MouseEvent(type, {
+          clientX: startLeft + 10 + dx,
+          clientY: startTop + 10 + dy
+        }), { pointerId: 1, isPrimary: true }));
+      };
+
+      pointer("pointerdown", 0, 0);
+      pointer("pointermove", 80, 40);
+      tooltip.renderResult("explain", "图片", "图表说明");
+
+      expect(root.querySelector(".tooltip-title")).toBe(handle);
+      expect(host.style.position).toBe("fixed");
+      expect(host.style.left).toBe(`${startLeft + 80}px`);
+      expect(host.style.top).toBe(`${startTop + 40}px`);
+      pointer("pointermove", 100, 50);
+      expect(host.style.left).toBe(`${startLeft + 100}px`);
+      expect(host.style.top).toBe(`${startTop + 50}px`);
+    } finally {
+      tooltip.destroy();
+      attachShadow.mockRestore();
     }
   });
 });

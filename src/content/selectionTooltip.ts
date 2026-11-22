@@ -205,12 +205,18 @@ export function getSelectionAndContext(includeImages = false): SelectionContext 
   };
 }
 
+const VIEWPORT_PADDING = 12;
+const KEYBOARD_MOVE_STEP = 16;
+
+type TooltipPosition = { left: number; top: number };
+
 class SelectionTooltipManager {
   private static instance: SelectionTooltipManager | null = null;
   private container: HTMLDivElement | null = null;
-  private shadowRoot: ShadowRoot | null = null;
   private card: HTMLDivElement | null = null;
   private activeAbsRect: { left: number; top: number; width: number; height: number } | null = null;
+  private draggedPosition: TooltipPosition | null = null;
+  private readonly reposition = () => this.positionCard();
 
   private constructor() {
     this.setupDismissListeners();
@@ -233,38 +239,20 @@ class SelectionTooltipManager {
 
     this.ensureContainer();
 
-    if (!this.card) return;
-
     const actionLabel = action === "translate" ? "AI 翻译中" : "AI 解释中";
 
-    this.card.innerHTML = `
-      <div class="tooltip-header">
-        <div class="tooltip-title">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 2s linear infinite;">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 2a10 10 0 0 1 10 10"></path>
-          </svg>
-          ${actionLabel}
-        </div>
-        <button class="tooltip-close" id="btn-close" title="Close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-      <div class="source-text">${this.escapeHtml(sourceText)}</div>
+    this.renderCard(sourceText, `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 2s linear infinite;">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 2a10 10 0 0 1 10 10"></path>
+      </svg>
+      ${actionLabel}
+    `, `
       <div class="tooltip-loading">
         <div class="spinner"></div>
         <span>正在分析内容...</span>
       </div>
-    `;
-
-    this.shadowRoot?.querySelector("#btn-close")?.addEventListener("click", () => this.destroy());
-
-    this.positionCard(this.activeAbsRect);
-    this.card.style.opacity = "1";
-    this.card.style.transform = "translateY(0)";
+    `);
   }
 
   public renderResult(action: SelectionAction, sourceText: string, text: string) {
@@ -273,73 +261,55 @@ class SelectionTooltipManager {
     const actionLabel = action === "translate" ? "AI 翻译" : "AI 解释";
     const renderedBody = this.parseMarkdown(text);
 
-    this.card.innerHTML = `
-      <div class="tooltip-header">
-        <div class="tooltip-title">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a6e3a1;">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-            <polyline points="2 17 12 22 22 17"></polyline>
-            <polyline points="2 12 12 17 22 12"></polyline>
-          </svg>
-          ${actionLabel}
-        </div>
-        <button class="tooltip-close" id="btn-close" title="Close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-      <div class="source-text">${this.escapeHtml(sourceText)}</div>
+    this.renderCard(sourceText, `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a6e3a1;">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+        <polyline points="2 17 12 22 22 17"></polyline>
+        <polyline points="2 12 12 17 22 12"></polyline>
+      </svg>
+      ${actionLabel}
+    `, `
       <div class="tooltip-body">${renderedBody}</div>
-    `;
-
-    this.shadowRoot?.querySelector("#btn-close")?.addEventListener("click", () => this.destroy());
-    if (this.activeAbsRect) {
-      this.positionCard(this.activeAbsRect);
-    }
+    `);
   }
 
   public renderError(action: SelectionAction, sourceText: string, error: string) {
-    if (!this.card) return;
-
     const actionLabel = action === "translate" ? "AI 翻译" : "AI 解释";
 
-    this.card.innerHTML = `
-      <div class="tooltip-header">
-        <div class="tooltip-title" style="color: #f38ba8;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-          ${actionLabel} 失败
-        </div>
-        <button class="tooltip-close" id="btn-close" title="Close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-      <div class="source-text">${this.escapeHtml(sourceText)}</div>
+    this.renderCard(sourceText, `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      ${actionLabel} 失败
+    `, `
       <div class="tooltip-body error-msg">${this.escapeHtml(error)}</div>
-    `;
-
-    this.shadowRoot?.querySelector("#btn-close")?.addEventListener("click", () => this.destroy());
-    if (this.activeAbsRect) {
-      this.positionCard(this.activeAbsRect);
-    }
+    `, true);
   }
 
   public destroy() {
     if (this.container) {
+      window.removeEventListener("resize", this.reposition);
       this.container.remove();
       this.container = null;
-      this.shadowRoot = null;
       this.card = null;
       this.activeAbsRect = null;
+      this.draggedPosition = null;
     }
+  }
+
+  private renderCard(sourceText: string, title: string, body: string, isError = false) {
+    if (!this.card) return;
+
+    const handle = this.card.querySelector<HTMLElement>(".tooltip-title")!;
+    const content = this.card.querySelector<HTMLElement>(".tooltip-content")!;
+    handle.innerHTML = title;
+    handle.classList.toggle("error-msg", isError);
+    content.innerHTML = `<div class="source-text">${this.escapeHtml(sourceText)}</div>${body}`;
+    content.scrollTop = 0;
+    this.positionCard();
+    this.card.style.opacity = "1";
   }
 
   private ensureContainer() {
@@ -351,7 +321,7 @@ class SelectionTooltipManager {
     this.container.style.position = "absolute";
     this.container.style.zIndex = "2147483647";
 
-    this.shadowRoot = this.container.attachShadow({ mode: "closed" });
+    const shadowRoot = this.container.attachShadow({ mode: "closed" });
 
     // CSS styling inside Shadow Root
     const style = document.createElement("style");
@@ -369,9 +339,10 @@ class SelectionTooltipManager {
         border: 1px solid rgba(255, 255, 255, 0.15);
         border-radius: 12px;
         padding: 16px;
-        width: 340px;
-        max-height: 400px;
-        overflow-y: auto;
+        width: min(340px, calc(100vw - ${VIEWPORT_PADDING * 2}px));
+        max-height: min(400px, calc(100dvh - ${VIEWPORT_PADDING * 2}px));
+        display: flex;
+        flex-direction: column;
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
         position: absolute;
         left: 0;
@@ -380,12 +351,12 @@ class SelectionTooltipManager {
         font-size: 14px;
         line-height: 1.5;
         opacity: 0;
-        transform: translateY(8px);
-        transition: opacity 0.2s ease, transform 0.2s ease;
+        transition: opacity 0.2s ease;
         pointer-events: auto;
       }
       .tooltip-header {
         display: flex;
+        flex-shrink: 0;
         justify-content: space-between;
         align-items: center;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -396,8 +367,16 @@ class SelectionTooltipManager {
         font-weight: 600;
         color: #a6e3a1;
         display: flex;
+        flex: 1;
         align-items: center;
+        min-height: 22px;
         gap: 6px;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+      }
+      .tooltip-title.dragging {
+        cursor: grabbing;
       }
       .tooltip-close {
         background: none;
@@ -414,6 +393,10 @@ class SelectionTooltipManager {
       .tooltip-close:hover {
         color: #f38ba8;
         background-color: rgba(255, 255, 255, 0.08);
+      }
+      .tooltip-content {
+        min-height: 0;
+        overflow-y: auto;
       }
       .tooltip-body {
         word-break: break-word;
@@ -499,62 +482,101 @@ class SelectionTooltipManager {
         overflow-y: auto;
       }
     `;
-    this.shadowRoot.appendChild(style);
+    shadowRoot.appendChild(style);
 
     this.card = document.createElement("div");
     this.card.className = "tooltip-card";
-    this.shadowRoot.appendChild(this.card);
+    this.card.innerHTML = `
+      <div class="tooltip-header">
+        <div class="tooltip-title" role="group" tabindex="0"
+          title="拖动窗口" aria-label="移动窗口，使用方向键调整位置"></div>
+        <button class="tooltip-close" type="button" title="Close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="tooltip-content"></div>
+    `;
+    this.setupDragHandle(this.card.querySelector<HTMLElement>(".tooltip-title")!);
+    this.card.querySelector(".tooltip-close")!.addEventListener("click", () => this.destroy());
+    shadowRoot.appendChild(this.card);
 
     document.body.appendChild(this.container);
+    window.addEventListener("resize", this.reposition);
   }
 
-  private positionCard(absRect: { left: number; top: number; width: number; height: number }) {
-    if (!this.container || !this.card) return;
+  private positionCard(position = this.draggedPosition) {
+    const anchor = this.activeAbsRect;
+    if (!this.container || !this.card || !anchor) return;
 
-    const cardWidth = 340;
-    const cardHeight = this.card.offsetHeight || 180;
-    const padding = 12;
+    const width = this.card.offsetWidth;
+    const height = this.card.offsetHeight;
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    const padding = position ? 0 : VIEWPORT_PADDING;
+    const scrollX = position ? 0 : window.scrollX;
+    const scrollY = position ? 0 : window.scrollY;
+    const anchorTop = anchor.top - scrollY;
+    const above = anchorTop - height - padding;
+    const desiredLeft = position?.left ?? anchor.left - scrollX + (anchor.width - width) / 2;
+    const desiredTop = position?.top ?? (above >= padding ? above : anchorTop + anchor.height + padding);
+    const left = Math.max(padding, Math.min(desiredLeft, viewportWidth - width - padding));
+    const top = Math.max(padding, Math.min(desiredTop, viewportHeight - height - padding));
 
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const scrollX = window.scrollX || window.pageXOffset;
-    const scrollY = window.scrollY || window.pageYOffset;
+    if (position) this.draggedPosition = { left, top };
+    this.container.style.position = position ? "fixed" : "absolute";
+    this.container.style.left = `${left + scrollX}px`;
+    this.container.style.top = `${top + scrollY}px`;
+  }
 
-    // Convert absolute selection rect to current viewport-relative rect to handle boundary checks
-    const viewportLeft = absRect.left - scrollX;
-    const viewportTop = absRect.top - scrollY;
+  private setupDragHandle(handle: HTMLElement) {
+    let drag: { pointerId: number; offsetX: number; offsetY: number } | null = null;
 
-    // Horizontal positioning: align to selection center, clamp within viewport
-    let left = viewportLeft + absRect.width / 2 - cardWidth / 2;
-    if (left < padding) {
-      left = padding;
-    } else if (left + cardWidth > viewportWidth - padding) {
-      left = viewportWidth - cardWidth - padding;
-    }
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || !event.isPrimary || drag || !this.container) return;
+      const { left, top } = this.container.getBoundingClientRect();
+      handle.setPointerCapture(event.pointerId);
+      drag = { pointerId: event.pointerId, offsetX: event.clientX - left, offsetY: event.clientY - top };
+      handle.classList.add("dragging");
+      event.preventDefault();
+    });
 
-    // Convert back to document-relative coordinate
-    const absoluteLeft = left + scrollX;
+    handle.addEventListener("pointermove", (event) => {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      this.positionCard({ left: event.clientX - drag.offsetX, top: event.clientY - drag.offsetY });
+    });
 
-    // Vertical positioning: try placing ABOVE the selection. If no space, place BELOW the selection.
-    let top = viewportTop - cardHeight - padding;
-    if (top < padding) {
-      // Not enough space above, place below
-      top = viewportTop + absRect.height + padding;
-    }
+    handle.addEventListener("lostpointercapture", (event) => {
+      if (drag?.pointerId !== event.pointerId) return;
+      drag = null;
+      handle.classList.remove("dragging");
+    });
 
-    // Clamp vertical position relative to viewport
-    if (top + cardHeight > viewportHeight - padding) {
-      top = viewportHeight - cardHeight - padding;
-    }
-    if (top < padding) {
-      top = padding;
-    }
-
-    // Convert back to document-relative coordinate
-    const absoluteTop = top + scrollY;
-
-    this.container.style.left = `${absoluteLeft}px`;
-    this.container.style.top = `${absoluteTop}px`;
+    handle.addEventListener("keydown", (event) => {
+      if (!this.container) return;
+      let { left, top } = this.container.getBoundingClientRect();
+      switch (event.key) {
+        case "ArrowLeft":
+          left -= KEYBOARD_MOVE_STEP;
+          break;
+        case "ArrowRight":
+          left += KEYBOARD_MOVE_STEP;
+          break;
+        case "ArrowUp":
+          top -= KEYBOARD_MOVE_STEP;
+          break;
+        case "ArrowDown":
+          top += KEYBOARD_MOVE_STEP;
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      this.positionCard({ left, top });
+    });
   }
 
   private setupDismissListeners() {
