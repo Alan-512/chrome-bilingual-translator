@@ -1,14 +1,24 @@
+import { type SelectionAction } from "../shared/messageTypes";
+import { findImagesInRange } from "./selectionImages";
+
 export interface SelectionContext {
   selectionText: string;
   contextText: string;
   rect: DOMRect;
+  images: HTMLImageElement[];
+  domSelection: Selection | null;
 }
 
-function findSelectionRecursively(node: Node): { sel: Selection; range: Range; rect: DOMRect } | null {
+function hasSelection(selection: Selection | null, includeImages: boolean): selection is Selection {
+  return !!selection?.rangeCount && !selection.isCollapsed &&
+    (includeImages || !!selection.toString().trim());
+}
+
+function findSelectionRecursively(node: Node, includeImages: boolean): { sel: Selection; range: Range; rect: DOMRect } | null {
   if (node instanceof Element) {
     if (node.shadowRoot) {
       const shadowSel = (node.shadowRoot as any).getSelection?.();
-      if (shadowSel && shadowSel.rangeCount > 0 && shadowSel.toString().trim()) {
+      if (hasSelection(shadowSel, includeImages)) {
         const range = shadowSel.getRangeAt(0);
         let rect = range.getBoundingClientRect();
         if (!rect || (rect.width === 0 && rect.height === 0)) {
@@ -26,28 +36,28 @@ function findSelectionRecursively(node: Node): { sel: Selection; range: Range; r
           return { sel: shadowSel, range, rect };
         }
       }
-      const res = findSelectionRecursively(node.shadowRoot);
+      const res = findSelectionRecursively(node.shadowRoot, includeImages);
       if (res) return res;
     }
     
     // Check standard children
     for (let i = 0; i < node.childNodes.length; i++) {
-      const res = findSelectionRecursively(node.childNodes[i]);
+      const res = findSelectionRecursively(node.childNodes[i], includeImages);
       if (res) return res;
     }
   } else if (node instanceof ShadowRoot) {
     for (let i = 0; i < node.childNodes.length; i++) {
-      const res = findSelectionRecursively(node.childNodes[i]);
+      const res = findSelectionRecursively(node.childNodes[i], includeImages);
       if (res) return res;
     }
   }
   return null;
 }
 
-function findDeepSelection(): { sel: Selection; range: Range; rect: DOMRect } | null {
+function findDeepSelection(includeImages: boolean): { sel: Selection; range: Range; rect: DOMRect } | null {
   // 1. Try to find selection via standard window.getSelection and trace into shadow DOMs
   let sel = window.getSelection();
-  if (sel && sel.rangeCount > 0 && sel.toString().trim()) {
+  if (hasSelection(sel, includeImages)) {
     let currentSel = sel;
     // Walk down into nested shadow DOMs
     while (true) {
@@ -76,7 +86,7 @@ function findDeepSelection(): { sel: Selection; range: Range; rect: DOMRect } | 
 
       if (nestedHost && nestedHost.shadowRoot) {
         const shadowSel = (nestedHost.shadowRoot as any).getSelection?.();
-        if (shadowSel && shadowSel.rangeCount > 0 && shadowSel.toString().trim()) {
+        if (hasSelection(shadowSel, includeImages)) {
           currentSel = shadowSel;
           continue;
         }
@@ -84,7 +94,7 @@ function findDeepSelection(): { sel: Selection; range: Range; rect: DOMRect } | 
       break;
     }
 
-    if (currentSel && currentSel.rangeCount > 0 && currentSel.toString().trim()) {
+    if (hasSelection(currentSel, includeImages)) {
       const range = currentSel.getRangeAt(0);
       let rect = range.getBoundingClientRect();
       if (!rect || (rect.width === 0 && rect.height === 0)) {
@@ -106,7 +116,7 @@ function findDeepSelection(): { sel: Selection; range: Range; rect: DOMRect } | 
 
   // 2. Fallback to recursive DOM traversal starting from document.body
   if (document.body) {
-    const result = findSelectionRecursively(document.body);
+    const result = findSelectionRecursively(document.body, includeImages);
     if (result) {
       return result;
     }
@@ -115,7 +125,7 @@ function findDeepSelection(): { sel: Selection; range: Range; rect: DOMRect } | 
   return null;
 }
 
-export function getSelectionAndContext(): SelectionContext | null {
+export function getSelectionAndContext(includeImages = false): SelectionContext | null {
   // 1. Traverse active elements recursively to find nested inputs or shadow roots
   let activeEl: Element | null = document.activeElement;
   while (activeEl && activeEl.shadowRoot && activeEl.shadowRoot.activeElement) {
@@ -125,6 +135,8 @@ export function getSelectionAndContext(): SelectionContext | null {
   let selectionText = "";
   let contextText = "";
   let rect: DOMRect | null = null;
+  let images: HTMLImageElement[] = [];
+  let domSelection: Selection | null = null;
 
   // 2. Check if the active element is an input or textarea
   if (
@@ -142,11 +154,15 @@ export function getSelectionAndContext(): SelectionContext | null {
 
   // 3. Fallback to recursive shadow-piercing selection
   if (!selectionText) {
-    const deepSelInfo = findDeepSelection();
+    const deepSelInfo = findDeepSelection(includeImages);
     if (deepSelInfo) {
       const { sel, range, rect: gotRect } = deepSelInfo;
       selectionText = sel.toString();
       rect = gotRect;
+      if (includeImages) {
+        images = findImagesInRange(range);
+        domSelection = sel;
+      }
 
       // Find nearest block ancestor for context
       let node: Node | null = range.startContainer;
@@ -161,7 +177,7 @@ export function getSelectionAndContext(): SelectionContext | null {
     }
   }
 
-  if (!selectionText.trim() || !rect) {
+  if ((!selectionText.trim() && !images.length) || !rect) {
     return null;
   }
 
@@ -183,7 +199,9 @@ export function getSelectionAndContext(): SelectionContext | null {
   return {
     selectionText: finalSelectionText,
     contextText: finalContextText,
-    rect
+    rect,
+    images,
+    domSelection
   };
 }
 
@@ -205,7 +223,7 @@ class SelectionTooltipManager {
     return SelectionTooltipManager.instance;
   }
 
-  public showLoading(rect: DOMRect, action: "translate" | "explain", sourceText: string) {
+  public showLoading(rect: DOMRect, action: SelectionAction, sourceText: string) {
     this.activeAbsRect = {
       left: rect.left + window.scrollX,
       top: rect.top + window.scrollY,
@@ -249,7 +267,7 @@ class SelectionTooltipManager {
     this.card.style.transform = "translateY(0)";
   }
 
-  public renderResult(action: "translate" | "explain", sourceText: string, text: string) {
+  public renderResult(action: SelectionAction, sourceText: string, text: string) {
     if (!this.card) return;
 
     const actionLabel = action === "translate" ? "AI 翻译" : "AI 解释";
@@ -282,7 +300,7 @@ class SelectionTooltipManager {
     }
   }
 
-  public renderError(action: "translate" | "explain", sourceText: string, error: string) {
+  public renderError(action: SelectionAction, sourceText: string, error: string) {
     if (!this.card) return;
 
     const actionLabel = action === "translate" ? "AI 翻译" : "AI 解释";

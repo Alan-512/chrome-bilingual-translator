@@ -41,18 +41,43 @@ export type PageStatusReportMessage = {
   pendingRequestCount: number;
 };
 
+export type SelectionAction = "translate" | "explain";
+export const MAX_SELECTION_IMAGE_EDGE = 2048;
+export const SELECTION_IMAGE_QUALITY = 0.93;
+
 export type SelectionRequestContextMessage = {
   type: "selection/request-context";
-  action: "translate" | "explain";
+  requestId: string;
+  action: SelectionAction;
+  imageUrl?: string;
+  hasSelectionText: boolean;
+};
+
+export type ImageCaptureRegion = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  scale: number;
+};
+
+export type SelectedImage = { dataUrl: string } | { capture: ImageCaptureRegion };
+
+export type SelectionContextResponse = {
+  selectionText: string;
+  contextText: string;
+  images: SelectedImage[];
+};
+
+export type SelectionShowLoadingMessage = {
+  type: "selection/show-loading";
+  requestId: string;
 };
 
 export type SelectionRenderResultMessage = {
   type: "selection/render-result";
-  action: "translate" | "explain";
-  status: "success" | "error";
-  text?: string;
-  error?: string;
-};
+  requestId: string;
+} & ({ status: "success"; text: string } | { status: "error"; error: string });
 
 export type RuntimeMessage =
   | ActivatePageTranslationMessage
@@ -61,5 +86,6 @@ export type RuntimeMessage =
   | TranslationRequestMessage
   | PageStatusReportMessage
   | SelectionRequestContextMessage
+  | SelectionShowLoadingMessage
   | SelectionRenderResultMessage;
 

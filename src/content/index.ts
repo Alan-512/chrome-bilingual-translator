@@ -1,6 +1,19 @@
 import { createPageController } from "./pageController";
 import { isExtensionContextInvalidatedError } from "./runtimeMessaging";
+import {
+  captureRegionsAreCurrent,
+  findContextImage,
+  readSelectedImages,
+  suspendSelectionHighlight
+} from "./selectionImages";
 import { getSelectionAndContext, SelectionTooltipManager } from "./selectionTooltip";
+import {
+  type SelectionAction,
+  type SelectionContextResponse,
+  type SelectionRequestContextMessage,
+  type SelectionShowLoadingMessage,
+  type SelectionRenderResultMessage
+} from "../shared/messageTypes";
 
 declare global {
   interface Window {
@@ -13,7 +26,14 @@ declare global {
 function bootstrapContentRuntime() {
   let currentTabId = 0;
   let debugMode = false;
-  let lastSelectionText = "";
+  let pendingSelection: {
+    requestId: string;
+    action: SelectionAction;
+    sourceText: string;
+    rect: DOMRect;
+    restoreSelection?: () => void;
+    validateCapture?: () => boolean;
+  } | undefined;
 
   const controller = createPageController(document, {
     async requestTranslations(blocks) {
@@ -100,43 +120,94 @@ function bootstrapContentRuntime() {
     }
 
     if (message?.type === "selection/request-context") {
-      const { action } = message as { action: "translate" | "explain" };
-      const selectionInfo = getSelectionAndContext();
-      if (!selectionInfo) {
+      const { action, requestId, imageUrl, hasSelectionText } = message as SelectionRequestContextMessage;
+      pendingSelection?.restoreSelection?.();
+      const clickedImage = imageUrl ? findContextImage(imageUrl) : undefined;
+      let selection = getSelectionAndContext(action === "explain");
+      if (clickedImage && !hasSelectionText && !selection?.images.includes(clickedImage)) {
+        selection = null;
+      }
+      if (!selection && !imageUrl) {
         sendResponse(null);
         return;
       }
 
-      lastSelectionText = selectionInfo.selectionText;
+      const selectionText = selection?.selectionText ?? "";
+      const images = selection?.images ?? [];
+      if (clickedImage && !images.includes(clickedImage)) images.push(clickedImage);
+      const rect = selection?.rect ?? clickedImage?.getBoundingClientRect() ??
+        new DOMRect(window.innerWidth / 2, window.innerHeight / 2);
+      const imageLabel = images.length > 1 ? `已选 ${images.length} 张图片` : "图片";
+      const sourceText = imageUrl || images.length
+        ? [selectionText, imageLabel].filter(Boolean).join(" · ")
+        : selectionText;
+      const tooltip = SelectionTooltipManager.getInstance();
+      tooltip.destroy();
+      pendingSelection = { requestId, action, sourceText, rect };
 
-      // Render loading tooltip card
-      SelectionTooltipManager.getInstance().showLoading(
-        selectionInfo.rect,
-        action,
-        selectionInfo.selectionText
-      );
+      try {
+        if (imageUrl && !clickedImage) throw new Error("无法定位这张图片，请重新右键点击图片后重试。");
+        const selectedImages = readSelectedImages(images);
+        const response: SelectionContextResponse = {
+          selectionText,
+          contextText: selectionText ? selection?.contextText ?? "" : "",
+          images: selectedImages
+        };
+        if (selectedImages.some((image) => "capture" in image)) {
+          pendingSelection.validateCapture = () => captureRegionsAreCurrent(images, selectedImages);
+          if (selection?.domSelection) {
+            const { ready, restore } = suspendSelectionHighlight(selection.domSelection);
+            pendingSelection.restoreSelection = restore;
+            void ready.then(() => sendResponse(pendingSelection?.requestId === requestId ? response : null));
+            return true;
+          }
+        } else {
+          tooltip.showLoading(rect, action, sourceText);
+        }
+        sendResponse(response);
+      } catch (error) {
+        pendingSelection = undefined;
+        tooltip.showLoading(rect, action, sourceText);
+        tooltip.renderError(action, sourceText, error instanceof Error ? error.message : String(error));
+        sendResponse(null);
+      }
+      return;
+    }
 
-      sendResponse({
-        selectionText: selectionInfo.selectionText,
-        contextText: selectionInfo.contextText
-      });
+    if (message?.type === "selection/show-loading") {
+      const { requestId } = message as SelectionShowLoadingMessage;
+      const pending = pendingSelection;
+      if (!pending || pending.requestId !== requestId) {
+        sendResponse({ ok: false });
+        return;
+      }
+
+      const captureIsCurrent = pending.validateCapture?.() ?? true;
+      pending.restoreSelection?.();
+      const tooltip = SelectionTooltipManager.getInstance();
+      tooltip.showLoading(pending.rect, pending.action, pending.sourceText);
+      if (!captureIsCurrent) {
+        pendingSelection = undefined;
+        tooltip.renderError(pending.action, pending.sourceText, "图片位置已变化，请重新选中图片后重试。");
+      }
+      sendResponse({ ok: captureIsCurrent });
       return;
     }
 
     if (message?.type === "selection/render-result") {
-      const { action, status, text, error } = message as {
-        action: "translate" | "explain";
-        status: "success" | "error";
-        text?: string;
-        error?: string;
-      };
-
+      const result = message as SelectionRenderResultMessage;
+      const pending = pendingSelection;
+      if (!pending || pending.requestId !== result.requestId) {
+        sendResponse({ ok: false });
+        return;
+      }
+      pendingSelection = undefined;
       const tooltip = SelectionTooltipManager.getInstance();
 
-      if (status === "success" && text) {
-        tooltip.renderResult(action, lastSelectionText, text);
+      if (result.status === "success") {
+        tooltip.renderResult(pending.action, pending.sourceText, result.text);
       } else {
-        tooltip.renderError(action, lastSelectionText, error || "Unknown rendering error.");
+        tooltip.renderError(pending.action, pending.sourceText, result.error);
       }
       sendResponse({ ok: true });
       return;
@@ -176,6 +247,7 @@ function bootstrapContentRuntime() {
 
   return {
     dispose() {
+      pendingSelection?.restoreSelection?.();
       chrome.runtime?.onMessage?.removeListener?.(runtimeListener);
       if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
         chrome.storage.onChanged.removeListener(storageListener);

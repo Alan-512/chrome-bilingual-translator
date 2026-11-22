@@ -7,7 +7,7 @@ It keeps the original text on the page and inserts translated text below the sou
 ## What It Does
 
 - **Full Page Bilingual Translation**: Manually translates the current webpage from the right-click menu, keeping the original text visible and inserting the selected target language cleanly below it.
-- **Selection Translation & Explain (with Shadow DOM Piercing)**: Select any word or block of text, right-click, and choose to instantly translate it or get a contextual explanation. It recursively pierces Shadow DOM boundaries to support selections inside custom Web Components and nested comment feeds, rendering inside a beautiful, non-intrusive floating card that auto-handles z-indexes and screen boundaries.
+- **Selection Translation & Explanation**: Right-click selected text to translate or explain it in a floating card, including text inside web components. Explain a webpage image on its own, or select text and images together for a combined explanation.
 - **Parallel Batch Translation & High-Throughput**: Employs an aggressive batching algorithm that packages up to 48 text blocks in a single translation request, running multiple streams in parallel to provide blistering translation speeds on content-heavy pages without triggering rate limits.
 - **Dynamic Scroll & Re-render Support**: Dynamically translates newly visible content as you scroll down (lazy translation) and recovers translation elements automatically if a dynamic page re-renders.
 - **Dynamic Target Language Switch & Isolated Cache**: Caching is fully isolated per target language. Modifying your target language in settings instantly triggers a clean page reactivation and re-translates all visible content in real-time with no page refresh required, preventing translation cache cross-contamination.
@@ -178,12 +178,13 @@ What happens next:
 - As you scroll, newly visible content continues translating automatically (lazy translation).
 - The original text stays fully in place, with the selected target-language translation neatly inserted below it.
 
-### 2. Selection Translate & Explain
-1. Highlight any word, phrase, or paragraph on a page.
-2. Right-click the highlighted text.
-3. Hover over **`Bilingual Translation Selection`** and choose:
-   - **`Translate Selection`**: Instantly shows the bilingual translation in a beautiful floating card.
-   - **`Explain Selection`**: Translates and provides deep linguistic/semantic explanation of the selected text.
+### 2. Selection Translation & Explanation
+
+- **Text** — highlight a word, phrase, or paragraph, then right-click and choose **AI Actions → Translate** or **AI Actions → Explain**.
+- **Image** — right-click a webpage image and choose **AI Actions → Explain**.
+- **Text and images** — drag to select the text and up to four images together, then right-click inside the selection and choose **AI Actions → Explain**.
+
+Image explanations require a model and API endpoint that accept image input. The extension sends the selected image pixels and accompanying text to your configured API and shows the explanation in the floating card.
 
 ## Settings
 

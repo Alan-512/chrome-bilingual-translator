@@ -15,6 +15,13 @@ import { createBackgroundMessageRouter } from "./messageRouter";
 import { createChromeApiOriginPermissionRequester } from "./permissionManager";
 import { SessionStorageTabSessionStore } from "./tabSessionStore";
 import { getMissingConfigFields, getApiBaseUrlSecurityError } from "../shared/config";
+import {
+  type SelectionContextResponse,
+  type SelectionRequestContextMessage,
+  type SelectionRenderResultMessage,
+  type SelectionShowLoadingMessage
+} from "../shared/messageTypes";
+import { resolveSelectionImages } from "./selectionImageCapture";
 
 const localStorageArea = createChromeStorageArea(chrome.storage.local);
 const sessionStorageArea = createChromeStorageArea(chrome.storage.session ?? chrome.storage.local);
@@ -42,11 +49,20 @@ const messageRouter = createBackgroundMessageRouter({
   debugLog
 });
 
-async function ensureMenuRegistered() {
-  const config = await loadExtensionConfig(localStorageArea);
-  await chrome.contextMenus.removeAll();
-  await registerToggleMenu(chrome.contextMenus, { enabled: false }, config.targetLanguage);
-  await registerSelectionMenus(chrome.contextMenus, config.targetLanguage);
+let menuRegistration = Promise.resolve();
+
+function ensureMenuRegistered(): Promise<void> {
+  // Installation and configuration changes can overlap. Keep each rebuild atomic
+  // with respect to other rebuilds, including the asynchronous create callbacks.
+  menuRegistration = menuRegistration.then(async () => {
+    const config = await loadExtensionConfig(localStorageArea);
+    await chrome.contextMenus.removeAll();
+    await registerToggleMenu(chrome.contextMenus, { enabled: false }, config.targetLanguage);
+    await registerSelectionMenus(chrome.contextMenus, config.targetLanguage);
+  }).catch((error) => {
+    console.error("Failed to register context menus:", error);
+  });
+  return menuRegistration;
 }
 
 
@@ -125,7 +141,8 @@ function bootstrap() {
   }
 
   // Register Service Worker event listeners synchronously before any async startup work.
-  // A cold-start context-menu event can arrive while menu registration is still pending.
+  // Chrome persists menu items across Worker restarts; only rebuild on installation
+  // or a target-language change, never on every Worker wake.
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "local" && changes.extensionConfig) {
       const oldLang = (changes.extensionConfig.oldValue as any)?.targetLanguage;
@@ -137,10 +154,6 @@ function bootstrap() {
   });
 
   chrome.runtime.onInstalled.addListener(() => {
-    void ensureMenuRegistered();
-  });
-
-  chrome.runtime.onStartup.addListener(() => {
     void ensureMenuRegistered();
   });
 
@@ -183,20 +196,21 @@ function bootstrap() {
   });
 
   chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (typeof tab?.id !== "number") {
+    const tabId = tab?.id;
+    if (!tab || typeof tabId !== "number") {
       return;
     }
 
     if (info.menuItemId === MENU_ID_TOGGLE_TRANSLATION) {
       void (async () => {
-        const session = await tabSessionStore.get(tab.id);
+        const session = await tabSessionStore.get(tabId);
         const type = session.enabled ? "page/deactivate" : "page/activate";
         await debugLog("context-menu:clicked", {
-          tabId: tab.id,
+          tabId,
           enabled: session.enabled,
           type
         });
-        await sendLifecycleMessage(tab.id, type);
+        await sendLifecycleMessage(tabId, type);
       })();
       return;
     }
@@ -204,10 +218,11 @@ function bootstrap() {
     if (info.menuItemId === MENU_ID_SELECTION_TRANSLATE || info.menuItemId === MENU_ID_SELECTION_EXPLAIN) {
       const action = info.menuItemId === MENU_ID_SELECTION_TRANSLATE ? "translate" : "explain";
       const frameId = typeof info.frameId === "number" ? info.frameId : 0;
+      const requestId = crypto.randomUUID();
 
       void (async () => {
         await debugLog("context-menu:selection:clicked", {
-          tabId: tab.id,
+          tabId,
           frameId,
           action
         });
@@ -216,7 +231,7 @@ function bootstrap() {
         let isLoaded = false;
         try {
           const pingResponse = await chrome.tabs.sendMessage(
-            tab.id,
+            tabId,
             { type: "runtime/ping" },
             { frameId }
           );
@@ -231,11 +246,11 @@ function bootstrap() {
         if (!isLoaded) {
           try {
             await chrome.scripting.executeScript({
-              target: { tabId: tab.id, frameIds: [frameId] },
+              target: { tabId, frameIds: [frameId] },
               files: ["dist/content.js"]
             });
             await debugLog("context-menu:selection:injected-runtime", {
-              tabId: tab.id,
+              tabId,
               frameId
             });
           } catch (injectError) {
@@ -245,11 +260,20 @@ function bootstrap() {
         }
 
         // 3. Request selection context from target frame
-        let selectionContext: { selectionText: string; contextText: string } | null = null;
+        let selectionContext: SelectionContextResponse | null;
         try {
+          const request: SelectionRequestContextMessage = {
+            type: "selection/request-context",
+            requestId,
+            action,
+            hasSelectionText: !!info.selectionText?.trim(),
+            ...(action === "explain" && info.mediaType === "image" && info.srcUrl
+              ? { imageUrl: info.srcUrl }
+              : {})
+          };
           selectionContext = await chrome.tabs.sendMessage(
-            tab.id,
-            { type: "selection/request-context", action },
+            tabId,
+            request,
             { frameId }
           );
         } catch (msgError) {
@@ -257,14 +281,28 @@ function bootstrap() {
           return;
         }
 
-        if (!selectionContext || !selectionContext.selectionText) {
-          await debugLog("context-menu:selection:empty", { tabId: tab.id, frameId });
+        if (!selectionContext || (!selectionContext.selectionText && !selectionContext.images.length)) {
+          await debugLog("context-menu:selection:empty", { tabId, frameId });
           return;
         }
 
-        const { selectionText, contextText } = selectionContext;
+        const { selectionText, contextText, images } = selectionContext;
+        let result: SelectionRenderResultMessage;
 
         try {
+          let imageDataUrls: string[];
+          let isCurrentRequest = true;
+          try {
+            imageDataUrls = await resolveSelectionImages(images, tabId, tab.windowId, info.pageUrl);
+          } finally {
+            if (images.some((image) => "capture" in image)) {
+              const loading: SelectionShowLoadingMessage = { type: "selection/show-loading", requestId };
+              const response = await chrome.tabs.sendMessage(tabId, loading, { frameId });
+              isCurrentRequest = Boolean(response?.ok);
+            }
+          }
+          if (!isCurrentRequest) return;
+
           // 4. Assert endpoint configuration and verify origin permissions
           const config = await loadExtensionConfig(localStorageArea);
           const missingFields = getMissingConfigFields(config);
@@ -287,38 +325,22 @@ function bootstrap() {
           }
 
           // 5. Invoke translator
-          const resultText = await translator.translateOrExplainSelection({
+          const text = await translator.translateOrExplainSelection({
             config,
             action,
             selectionText,
-            contextText
+            contextText,
+            imageDataUrls
           });
 
-          // 6. Dispatch render result
-          await chrome.tabs.sendMessage(
-            tab.id,
-            {
-              type: "selection/render-result",
-              action,
-              status: "success",
-              text: resultText
-            },
-            { frameId }
-          );
+          result = { type: "selection/render-result", requestId, status: "success", text };
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : "Unknown error";
-          await chrome.tabs.sendMessage(
-            tab.id,
-            {
-              type: "selection/render-result",
-              action,
-              status: "error",
-              error: errorMsg
-            },
-            { frameId }
-          );
+          const error = err instanceof Error ? err.message : "Unknown error";
+          result = { type: "selection/render-result", requestId, status: "error", error };
         }
-      })();
+
+        await chrome.tabs.sendMessage(tabId, result, { frameId });
+      })().catch((error) => console.error("Selection action failed:", error));
       return;
     }
   });
@@ -341,10 +363,6 @@ function bootstrap() {
     })();
 
     return true;
-  });
-
-  void ensureMenuRegistered().catch((error) => {
-    console.error("Failed to register context menus:", error);
   });
 }
 

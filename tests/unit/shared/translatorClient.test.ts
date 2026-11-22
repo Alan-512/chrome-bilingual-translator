@@ -944,6 +944,61 @@ describe("translator client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  const imageDataUrl = "data:image/jpeg;base64,YWJj";
+
+  it.each([
+    {
+      provider: "openai-compatible",
+      apiBaseUrl: "https://api.example.com/v1/chat/completions",
+      response: { choices: [{ message: { content: "解释" } }] },
+      requestPart: { type: "image_url", image_url: { url: imageDataUrl } }
+    },
+    {
+      provider: "openrouter",
+      apiBaseUrl: "https://openrouter.ai/api/v1/chat/completions",
+      response: { choices: [{ message: { content: "解释" } }] },
+      requestPart: { type: "image_url", image_url: { url: imageDataUrl } }
+    },
+    {
+      provider: "openai-compatible",
+      apiBaseUrl: "https://api.example.com/v1/responses",
+      response: { output_text: "解释" },
+      requestPart: { type: "input_image", image_url: imageDataUrl, detail: "auto" }
+    },
+    {
+      provider: "google-gemini",
+      apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      response: { candidates: [{ content: { parts: [{ text: "解释" }] } }] },
+      requestPart: { inlineData: { mimeType: "image/jpeg", data: "YWJj" } }
+    }
+  ] as const)("sends images and text together to $apiBaseUrl", async ({ provider, apiBaseUrl, response, requestPart }) => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      const parts = body.messages?.[1].content ?? body.input?.[1].content ?? body.contents[0].parts;
+      expect(JSON.parse(parts[0].text)).toMatchObject({
+        selectedText: "图中的蓝线",
+        task: "Explain the selected text and images together."
+      });
+      expect(parts).toHaveLength(2);
+      expect(parts[1]).toEqual(requestPart);
+      return Response.json(response);
+    });
+
+    const cache = new PersistentTranslationCache(createMemoryStorageArea());
+    const client = createTranslatorClient({ fetchImpl: fetchMock, cache });
+    const input = {
+      config: { ...DEFAULT_EXTENSION_CONFIG, provider, apiBaseUrl, apiKey: "test-key", model: "test-model" },
+      action: "explain" as const,
+      selectionText: "图中的蓝线",
+      contextText: "图中的蓝线",
+      imageDataUrls: [imageDataUrl]
+    };
+    await cache.setMany([{ sourceText: "selection:v2:explain:图中的蓝线", translation: "纯文字结果" }], "zh-CN");
+    await expect(client.translateOrExplainSelection(input)).resolves.toBe("解释");
+    await expect(client.translateOrExplainSelection(input)).resolves.toBe("解释");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it.each([false, true])("assembles and caches the complete Gemini explanation (legacy cache: %s)", async (hasLegacyCache) => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe(

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   MENU_ID_TOGGLE_TRANSLATION,
@@ -13,6 +13,9 @@ import {
   registerSelectionMenus,
   type ContextMenuItem
 } from "../../../src/background/contextMenus";
+
+beforeEach(() => { vi.stubGlobal("chrome", { runtime: {} }); });
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("context menu labeling", () => {
   it("uses the translate label for tabs without active translation", () => {
@@ -59,13 +62,48 @@ describe("buildToggleMenuItem", () => {
 });
 
 describe("context menu api integration", () => {
+  it("waits for Chrome's callback before creating selection children", async () => {
+    const created: ContextMenuItem[] = [];
+    const callbacks: Array<() => void> = [];
+    const registration = registerSelectionMenus({
+      create(item, callback) {
+        created.push(item);
+        callbacks.push(callback);
+        return item.id;
+      }
+    }, "zh-CN");
+
+    expect(created.map((item) => item.id)).toEqual([MENU_ID_SELECTION_PARENT]);
+    callbacks[0]!();
+    await Promise.resolve();
+    expect(created.map((item) => item.id)).toEqual([MENU_ID_SELECTION_PARENT, MENU_ID_SELECTION_TRANSLATE]);
+    callbacks[1]!();
+    await Promise.resolve();
+    expect(created.map((item) => item.id)).toEqual([
+      MENU_ID_SELECTION_PARENT, MENU_ID_SELECTION_TRANSLATE, MENU_ID_SELECTION_EXPLAIN
+    ]);
+    callbacks[2]!();
+    await registration;
+  });
+
+  it("rejects callback errors without creating children of a failed parent", async () => {
+    const create = vi.fn((_item: ContextMenuItem, callback: () => void) => {
+      vi.stubGlobal("chrome", { runtime: { lastError: { message: "Parent creation failed" } } });
+      callback();
+    });
+
+    await expect(registerSelectionMenus({ create }, "zh-CN")).rejects.toThrow("Parent creation failed");
+    expect(create).toHaveBeenCalledOnce();
+  });
+
   it("registers the toggle menu item", async () => {
     const created: ContextMenuItem[] = [];
 
     await registerToggleMenu(
       {
-        create(item) {
+        create(item, callback) {
           created.push(item);
+          callback();
         }
       },
       { enabled: false }
@@ -85,8 +123,9 @@ describe("context menu api integration", () => {
 
     await registerToggleMenu(
       {
-        create(item) {
+        create(item, callback) {
           created.push(item);
+          callback();
         }
       },
       { enabled: false },
@@ -174,8 +213,9 @@ describe("context menu api integration", () => {
     const createdZh: ContextMenuItem[] = [];
     await registerSelectionMenus(
       {
-        create(item) {
+        create(item, callback) {
           createdZh.push(item);
+          callback();
         }
       },
       "zh-CN"
@@ -185,7 +225,7 @@ describe("context menu api integration", () => {
       {
         id: MENU_ID_SELECTION_PARENT,
         title: "AI 操作",
-        contexts: ["selection"]
+        contexts: ["selection", "image"]
       },
       {
         id: MENU_ID_SELECTION_TRANSLATE,
@@ -197,15 +237,16 @@ describe("context menu api integration", () => {
         id: MENU_ID_SELECTION_EXPLAIN,
         parentId: MENU_ID_SELECTION_PARENT,
         title: "解释",
-        contexts: ["selection"]
+        contexts: ["selection", "image"]
       }
     ]);
 
     const createdEn: ContextMenuItem[] = [];
     await registerSelectionMenus(
       {
-        create(item) {
+        create(item, callback) {
           createdEn.push(item);
+          callback();
         }
       },
       "en"
@@ -215,7 +256,7 @@ describe("context menu api integration", () => {
       {
         id: MENU_ID_SELECTION_PARENT,
         title: "AI Actions",
-        contexts: ["selection"]
+        contexts: ["selection", "image"]
       },
       {
         id: MENU_ID_SELECTION_TRANSLATE,
@@ -227,15 +268,16 @@ describe("context menu api integration", () => {
         id: MENU_ID_SELECTION_EXPLAIN,
         parentId: MENU_ID_SELECTION_PARENT,
         title: "Explain",
-        contexts: ["selection"]
+        contexts: ["selection", "image"]
       }
     ]);
 
     const createdTw: ContextMenuItem[] = [];
     await registerSelectionMenus(
       {
-        create(item) {
+        create(item, callback) {
           createdTw.push(item);
+          callback();
         }
       },
       "zh-TW"
@@ -245,7 +287,7 @@ describe("context menu api integration", () => {
       {
         id: MENU_ID_SELECTION_PARENT,
         title: "AI 動作",
-        contexts: ["selection"]
+        contexts: ["selection", "image"]
       },
       {
         id: MENU_ID_SELECTION_TRANSLATE,
@@ -257,7 +299,7 @@ describe("context menu api integration", () => {
         id: MENU_ID_SELECTION_EXPLAIN,
         parentId: MENU_ID_SELECTION_PARENT,
         title: "解釋",
-        contexts: ["selection"]
+        contexts: ["selection", "image"]
       }
     ]);
   });

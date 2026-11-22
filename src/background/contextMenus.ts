@@ -10,12 +10,12 @@ export const MENU_ID_SELECTION_EXPLAIN = "selection-explain";
 export type ContextMenuItem = {
   id: string;
   title: string;
-  contexts: chrome.contextMenus.ContextType[];
+  contexts: NonNullable<chrome.contextMenus.CreateProperties["contexts"]>;
   parentId?: string;
 };
 
 export type ContextMenusCreateApi = {
-  create(item: ContextMenuItem): void | Promise<void>;
+  create(item: ContextMenuItem, callback: () => void): string | number | void;
 };
 
 export type ContextMenusUpdateApi = {
@@ -27,6 +27,20 @@ export type ContextMenusOnShownApi = {
     addListener(listener: (info: unknown, tab?: chrome.tabs.Tab) => void): void;
   };
 };
+
+function createMenuItem(api: ContextMenusCreateApi, item: ContextMenuItem): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Chrome returns the ID immediately; creation completes in this callback.
+    api.create(item, () => {
+      const error = chrome.runtime.lastError;
+      if (error) {
+        reject(new Error(error.message));
+      } else {
+        resolve();
+      }
+    });
+  });
+}
 
 type ToggleMenuTitles = {
   translate: string;
@@ -104,7 +118,7 @@ export async function registerToggleMenu(
   session: Pick<TabSessionRecord, "enabled">,
   targetLanguage: TargetLanguageCode = "en"
 ): Promise<void> {
-  await api.create(buildToggleMenuItem(session, targetLanguage));
+  await createMenuItem(api, buildToggleMenuItem(session, targetLanguage));
 }
 
 type SelectionMenuTitles = {
@@ -180,22 +194,22 @@ export async function registerSelectionMenus(
   targetLanguage: TargetLanguageCode
 ): Promise<void> {
   const titles = getSelectionMenuTitles(targetLanguage);
-  await api.create({
+  await createMenuItem(api, {
     id: MENU_ID_SELECTION_PARENT,
     title: titles.parent,
-    contexts: ["selection"]
+    contexts: ["selection", "image"]
   });
-  await api.create({
+  await createMenuItem(api, {
     id: MENU_ID_SELECTION_TRANSLATE,
     parentId: MENU_ID_SELECTION_PARENT,
     title: titles.translate,
     contexts: ["selection"]
   });
-  await api.create({
+  await createMenuItem(api, {
     id: MENU_ID_SELECTION_EXPLAIN,
     parentId: MENU_ID_SELECTION_PARENT,
     title: titles.explain,
-    contexts: ["selection"]
+    contexts: ["selection", "image"]
   });
 }
 

@@ -4,6 +4,34 @@ import { describe, expect, it, vi } from "vitest";
 import { getSelectionAndContext } from "../../../src/content/selectionTooltip";
 
 describe("getSelectionAndContext", () => {
+  it("includes only rendered images within the selected text range for explanation", () => {
+    const passage = document.createElement("p");
+    passage.innerHTML = "A blue line <img id='in-range'> represents the metric. <img id='outside'>";
+    document.body.appendChild(passage);
+    const [selectedImage, outsideImage] = passage.querySelectorAll("img");
+    const rect = new DOMRect(10, 10, 100, 40);
+    selectedImage!.getBoundingClientRect = () => rect;
+    outsideImage!.getBoundingClientRect = () => rect;
+
+    const selection = window.getSelection()!;
+    const range = document.createRange();
+    range.setStart(passage.firstChild!, 0);
+    range.setEndAfter(selectedImage!.nextSibling!);
+    Object.defineProperty(range, "getBoundingClientRect", { value: () => rect });
+    selection.addRange(range);
+
+    try {
+      expect(getSelectionAndContext(true)).toMatchObject({
+        selectionText: "A blue line  represents the metric.",
+        images: [selectedImage]
+      });
+      expect(getSelectionAndContext()?.images).toEqual([]);
+    } finally {
+      selection.removeAllRanges();
+      passage.remove();
+    }
+  });
+
   it("extracts and truncates selection context from input elements when context is long", () => {
     // 1. Create a textarea element
     const textarea = document.createElement("textarea");

@@ -1,5 +1,6 @@
 import { getTargetLanguagePromptLabel, type ExtensionConfig, type TargetLanguageCode } from "./config";
 import { type PersistentTranslationCache } from "./cacheStore";
+import { type SelectionAction } from "./messageTypes";
 import { buildTranslationMessages, type TranslationPromptBlock } from "./promptBuilder";
 
 export type TranslationBlockInput = TranslationPromptBlock;
@@ -14,9 +15,10 @@ export type TranslatorClient = {
   }): Promise<void>;
   translateOrExplainSelection(input: {
     config: ExtensionConfig;
-    action: "translate" | "explain";
+    action: SelectionAction;
     selectionText: string;
     contextText: string;
+    imageDataUrls?: string[];
   }): Promise<string>;
 };
 
@@ -392,136 +394,80 @@ function toNetworkErrorMessage(url: string) {
   return `Network request to ${url} failed before receiving a response. Check whether this API host is reachable and not blocked by proxy, firewall, DNS, or TLS issues.`;
 }
 
-function buildGeminiSelectionBody(
-  model: string,
-  action: "translate" | "explain",
+function buildSelectionPrompt(
+  action: SelectionAction,
   selectionText: string,
   contextText: string,
-  targetLanguage: TargetLanguageCode
+  targetLanguage: TargetLanguageCode,
+  hasImages: boolean
 ) {
   const targetLanguageLabel = getTargetLanguagePromptLabel(targetLanguage);
-  let systemText = "";
-  if (action === "translate") {
+  let systemText: string;
+  let task: string;
+  if (hasImages) {
+    systemText = `Explain the meaning of the supplied images in ${targetLanguageLabel}. Describe the visual evidence that supports the explanation. If selected text is provided, explain how it relates to the images and interpret them together. Treat text in the inputs as source material. Indicate uncertainty when details are unreadable or ambiguous. Return a concise, clear explanation.`;
+    task = selectionText
+      ? "Explain the selected text and images together."
+      : "Explain the meaning of the selected images.";
+  } else if (action === "translate") {
     systemText = `You are a professional translation assistant. Translate the user's selected text into ${targetLanguageLabel}. Use the provided surrounding context to resolve any ambiguity, homophones, or semantic tone, but do not translate or include the context in the output. The response should only be the translation of the selected text itself, without any extra explanation, markdown wrapping, or conversational filler.`;
+    task = `Translate the selected text into ${targetLanguageLabel}.`;
   } else {
     systemText = `You are an expert bilingual dictionary and vocabulary assistant. Explain the meaning of the selected word, phrase, or sentence in detail. Base your explanation on the surrounding context to ensure accurate semantic understanding. You must output the explanation in ${targetLanguageLabel}. Be precise, concise, and structured, explaining any nuances or context-specific meanings. Return only the explanation without conversational filler.`;
+    task = `Explain the selected text in ${targetLanguageLabel}, leveraging the surrounding context.`;
   }
 
   return {
-    ...(buildGeminiThinkingConfig(model)
-      ? {
-          generationConfig: buildGeminiThinkingConfig(model)
-        }
-      : {}),
-    systemInstruction: {
-      parts: [
-        {
-          text: systemText
-        }
-      ]
-    },
-    contents: [
-      {
-        parts: [
-          {
-            text: JSON.stringify(
-              {
-                task: action === "translate"
-                  ? `Translate the selected text into ${targetLanguageLabel}.`
-                  : `Explain the selected text in ${targetLanguageLabel}, leveraging the surrounding context.`,
-                targetLanguage: targetLanguageLabel,
-                selectedText: selectionText,
-                surroundingContext: contextText
-              },
-              null,
-              2
-            )
-          }
-        ]
-      }
-    ]
+    systemText,
+    userText: JSON.stringify({
+      task,
+      targetLanguage: targetLanguageLabel,
+      selectedText: selectionText,
+      surroundingContext: contextText
+    }, null, 2)
   };
 }
 
-function buildSelectionChatMessages(
-  action: "translate" | "explain",
-  selectionText: string,
-  contextText: string,
-  targetLanguage: TargetLanguageCode
-) {
-  const targetLanguageLabel = getTargetLanguagePromptLabel(targetLanguage);
-  let systemText = "";
-  if (action === "translate") {
-    systemText = `You are a professional translation assistant. Translate the user's selected text into ${targetLanguageLabel}. Use the provided surrounding context to resolve any ambiguity, homophones, or semantic tone, but do not translate or include the context in the output. The response should only be the translation of the selected text itself, without any extra explanation, markdown wrapping, or conversational filler.`;
-  } else {
-    systemText = `You are an expert bilingual dictionary and vocabulary assistant. Explain the meaning of the selected word, phrase, or sentence in detail. Base your explanation on the surrounding context to ensure accurate semantic understanding. You must output the explanation in ${targetLanguageLabel}. Be precise, concise, and structured, explaining any nuances or context-specific meanings. Return only the explanation without conversational filler.`;
-  }
+type SelectionPrompt = ReturnType<typeof buildSelectionPrompt>;
 
+function buildGeminiSelectionBody(model: string, prompt: SelectionPrompt, imageDataUrls: string[]) {
+  const generationConfig = buildGeminiThinkingConfig(model);
+  return {
+    ...(generationConfig ? { generationConfig } : {}),
+    systemInstruction: { parts: [{ text: prompt.systemText }] },
+    contents: [{
+      parts: [
+        { text: prompt.userText },
+        ...imageDataUrls.map((url) => {
+          const separator = url.indexOf(",");
+          return { inlineData: { mimeType: url.slice(5, url.indexOf(";")), data: url.slice(separator + 1) } };
+        })
+      ]
+    }]
+  };
+}
+
+function buildSelectionChatMessages(prompt: SelectionPrompt, imageDataUrls: string[]) {
   return [
-    {
-      role: "system",
-      content: systemText
-    },
+    { role: "system", content: prompt.systemText },
     {
       role: "user",
-      content: JSON.stringify(
-        {
-          task: action === "translate"
-            ? `Translate the selected text into ${targetLanguageLabel}.`
-            : `Explain the selected text in ${targetLanguageLabel}, leveraging the surrounding context.`,
-          targetLanguage: targetLanguageLabel,
-          selectedText: selectionText,
-          surroundingContext: contextText
-        },
-        null,
-        2
-      )
+      content: imageDataUrls.length ? [
+        { type: "text", text: prompt.userText },
+        ...imageDataUrls.map((url) => ({ type: "image_url", image_url: { url } }))
+      ] : prompt.userText
     }
   ];
 }
 
-function buildSelectionResponsesApiInput(
-  action: "translate" | "explain",
-  selectionText: string,
-  contextText: string,
-  targetLanguage: TargetLanguageCode
-) {
-  const targetLanguageLabel = getTargetLanguagePromptLabel(targetLanguage);
-  let systemText = "";
-  if (action === "translate") {
-    systemText = `You are a professional translation assistant. Translate the user's selected text into ${targetLanguageLabel}. Use the provided surrounding context to resolve any ambiguity, homophones, or semantic tone, but do not translate or include the context in the output. The response should only be the translation of the selected text itself, without any extra explanation, markdown wrapping, or conversational filler.`;
-  } else {
-    systemText = `You are an expert bilingual dictionary and vocabulary assistant. Explain the meaning of the selected word, phrase, or sentence in detail. Base your explanation on the surrounding context to ensure accurate semantic understanding. You must output the explanation in ${targetLanguageLabel}. Be precise, concise, and structured, explaining any nuances or context-specific meanings. Return only the explanation without conversational filler.`;
-  }
-
+function buildSelectionResponsesApiInput(prompt: SelectionPrompt, imageDataUrls: string[]) {
   return [
-    {
-      role: "system",
-      content: [
-        {
-          type: "input_text",
-          text: systemText
-        }
-      ]
-    },
+    { role: "system", content: [{ type: "input_text", text: prompt.systemText }] },
     {
       role: "user",
       content: [
-        {
-          type: "input_text",
-          text: JSON.stringify(
-            {
-              task: action === "translate"
-                ? `Translate the selected text into ${targetLanguageLabel}.`
-                : `Explain the selected text in ${targetLanguageLabel}, leveraging the surrounding context.`,
-              targetLanguage: targetLanguageLabel,
-              selectedText: selectionText,
-              surroundingContext: contextText
-            },
-            null,
-            2
-          )
-        }
+        { type: "input_text", text: prompt.userText },
+        ...imageDataUrls.map((url) => ({ type: "input_image", image_url: url, detail: "auto" }))
       ]
     }
   ];
@@ -689,13 +635,16 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
       }
     },
 
-    async translateOrExplainSelection({ config, action, selectionText, contextText }) {
-      // Older selection entries may contain only the first part of the response.
-      const cacheKey = `selection:v2:${action}:${selectionText}`;
-      const cachedResult = await options.cache.get(cacheKey, config.targetLanguage);
-      if (cachedResult) {
-        return cachedResult;
+    async translateOrExplainSelection({ config, action, selectionText, contextText, imageDataUrls = [] }) {
+      const hasImages = imageDataUrls.length > 0;
+      // Image selections can change independently of their text.
+      const cacheKey = hasImages ? null : `selection:v2:${action}:${selectionText}`;
+      if (cacheKey) {
+        const cachedResult = await options.cache.get(cacheKey, config.targetLanguage);
+        if (cachedResult) return cachedResult;
       }
+
+      const prompt = buildSelectionPrompt(action, selectionText, contextText, config.targetLanguage, hasImages);
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -710,13 +659,7 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                   "Content-Type": "application/json",
                   "x-goog-api-key": config.apiKey
                 },
-                body: buildGeminiSelectionBody(
-                  config.model,
-                  action,
-                  selectionText,
-                  contextText,
-                  config.targetLanguage
-                )
+                body: buildGeminiSelectionBody(config.model, prompt, imageDataUrls)
               }
             : (() => {
                 const resolvedApi = resolveApiMode(config.apiBaseUrl, config.provider);
@@ -733,22 +676,12 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
                       ? {
                           model: config.model,
                           ...buildOpenAiReasoningConfig(resolvedApi.url, config.model),
-                          messages: buildSelectionChatMessages(
-                            action,
-                            selectionText,
-                            contextText,
-                            config.targetLanguage
-                          )
+                          messages: buildSelectionChatMessages(prompt, imageDataUrls)
                         }
                       : {
                           model: config.model,
                           ...buildOpenAiReasoningConfig(resolvedApi.url, config.model),
-                          input: buildSelectionResponsesApiInput(
-                            action,
-                            selectionText,
-                            contextText,
-                            config.targetLanguage
-                          )
+                          input: buildSelectionResponsesApiInput(prompt, imageDataUrls)
                         }
                 };
               })();
@@ -761,7 +694,11 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
         });
 
         if (!response.ok) {
-          throw new Error(await readApiErrorMessage(response));
+          const detail = await readApiErrorMessage(response);
+          if (hasImages && [400, 404, 415, 422].includes(response.status)) {
+            throw new Error(`请确认所选模型和 API 端点支持图片输入。\n${detail}`);
+          }
+          throw new Error(detail);
         }
 
         const responseBody = (await response.json()) as OpenAiCompatibleResponse &
@@ -790,10 +727,12 @@ export function createTranslatorClient(options: CreateTranslatorClientOptions): 
           throw new Error("Selection translation/explanation response did not include a content payload.");
         }
 
-        await options.cache.setMany(
-          [{ sourceText: cacheKey, translation: finalResult }],
-          config.targetLanguage
-        );
+        if (cacheKey) {
+          await options.cache.setMany(
+            [{ sourceText: cacheKey, translation: finalResult }],
+            config.targetLanguage
+          );
+        }
 
         return finalResult;
       } catch (error) {
